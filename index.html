@@ -1311,6 +1311,65 @@
       if (!ignoreInner) unstickPlayer(p, r);
     }
 
+    // ========================================================================
+    // FÍSICA DE LUZ: A LANTERNA NÃO ATRAVESSA PAREDES (RAYCASTING O(1) SLABS)
+    // ========================================================================
+    function rayCastToWalls(ox, oy, dx, dy, maxDist, walls) {
+      let closest = maxDist;
+      for (let i = 0; i < walls.length; i++) {
+        const w = walls[i];
+        let tmin = 0;
+        let tmax = maxDist;
+
+        if (Math.abs(dx) > 0.00001) {
+          let tx1 = (w.x - ox) / dx;
+          let tx2 = (w.x + w.w - ox) / dx;
+          if (tx1 > tx2) { const tmp = tx1; tx1 = tx2; tx2 = tmp; }
+          tmin = Math.max(tmin, tx1);
+          tmax = Math.min(tmax, tx2);
+        } else if (ox < w.x || ox > w.x + w.w) {
+          continue;
+        }
+
+        if (Math.abs(dy) > 0.00001) {
+          let ty1 = (w.y - oy) / dy;
+          let ty2 = (w.y + w.h - oy) / dy;
+          if (ty1 > ty2) { const tmp = ty1; ty1 = ty2; ty2 = tmp; }
+          tmin = Math.max(tmin, ty1);
+          tmax = Math.min(tmax, ty2);
+        } else if (oy < w.y || oy > w.y + w.h) {
+          continue;
+        }
+
+        if (tmin <= tmax && tmin >= 0 && tmin < closest) {
+          closest = tmin;
+        }
+      }
+      return closest;
+    }
+
+    function hasLineOfSight(x1, y1, x2, y2, walls) {
+      const dist = Math.hypot(x2 - x1, y2 - y1);
+      if (dist < 2) return true;
+      const dx = (x2 - x1) / dist;
+      const dy = (y2 - y1) / dist;
+      const hitDist = rayCastToWalls(x1, y1, dx, dy, dist, walls);
+      return hitDist >= dist - 6;
+    }
+
+    function computeLightConePolygon(ox, oy, aimAngle, spread, maxRange, walls, numRays = 30) {
+      const points = [];
+      const step = (spread * 2) / numRays;
+      for (let i = 0; i <= numRays; i++) {
+        const ang = aimAngle - spread + i * step;
+        const dx = Math.cos(ang);
+        const dy = Math.sin(ang);
+        const dist = rayCastToWalls(ox, oy, dx, dy, maxRange, walls);
+        points.push({ x: ox + dx * dist, y: oy + dy * dist });
+      }
+      return points;
+    }
+
     function stepHostSimulation(dt) {
       if (hostEngine.toastTimer > 0) {
         hostEngine.toastTimer -= dt;
@@ -1326,21 +1385,27 @@
       const ghost = pList.find(x => x.role === 'ghost');
       if (ghost) ghost.lit = false;
 
-      // Clones Assustadores (Apenas rodeiam e assustam a ~82px de distância, NUNCA sobrepõem jogadores!)
+      // Clones Assustadores:
+      // Se houver caçador por perto (< 260px), ele sente a presença e vai assustar.
+      // Se NÃO houver caçador por perto, ele segue e protege o Fantasma Mestre!
       const SCARE_ORBIT_DIST = 82;
       const MIN_PLAYER_SEP = 68;
+      const CLONE_SENSE_RADIUS = 260;
+
       for (let i = hostEngine.clones.length - 1; i >= 0; i--) {
         const cl = hostEngine.clones[i];
         cl.timer -= dt;
         if (cl.timer <= 0) { hostEngine.clones.splice(i, 1); continue; }
         cl.orbitAngle = (cl.orbitAngle || 0) + dt * 3.8;
 
-        const targets = pList.filter(h => h.role === 'hunter' && !h.frozen);
-        targets.sort((a, b) => Math.hypot(a.x - cl.x, a.y - cl.y) - Math.hypot(b.x - cl.x, b.y - cl.y));
-        const tgt = targets[0];
+        // Procura Caçadores vivos dentro do raio de percepção sensorial (260px)
+        const nearbyHunters = pList.filter(h => h.role === 'hunter' && !h.frozen && Math.hypot(h.x - cl.x, h.y - cl.y) <= CLONE_SENSE_RADIUS);
+        nearbyHunters.sort((a, b) => Math.hypot(a.x - cl.x, a.y - cl.y) - Math.hypot(b.x - cl.x, b.y - cl.y));
+        const tgt = nearbyHunters[0];
+
         if (tgt) {
+          // Sentiu o caçador no raio próximo! Persegue e orbita a 82px sem sobrepor
           const distToHunter = Math.hypot(tgt.x - cl.x, tgt.y - cl.y);
-          // Posição alvo fica numa órbita ao redor do Caçador (a 82px de distância) para nunca ficar em cima dele
           const desiredX = tgt.x + Math.cos(cl.orbitAngle) * SCARE_ORBIT_DIST;
           const desiredY = tgt.y + Math.sin(cl.orbitAngle) * SCARE_ORBIT_DIST;
           const dx = desiredX - cl.x;
@@ -1350,6 +1415,17 @@
           cl.x += (dx / dLen) * step;
           cl.y += (dy / dLen) * step;
           cl.scaring = distToHunter < 125;
+        } else if (ghost) {
+          // Nenhum caçador por perto: segue e acompanha o Fantasma Mestre!
+          const desiredX = ghost.x + Math.cos(cl.orbitAngle) * 72;
+          const desiredY = ghost.y + Math.sin(cl.orbitAngle) * 72;
+          const dx = desiredX - cl.x;
+          const dy = desiredY - cl.y;
+          const dLen = Math.max(1, Math.hypot(dx, dy));
+          const step = Math.min(dLen, 190 * dt);
+          cl.x += (dx / dLen) * step;
+          cl.y += (dy / dLen) * step;
+          cl.scaring = false;
         } else {
           cl.scaring = false;
         }
@@ -1440,13 +1516,16 @@
           const dist = Math.hypot(ghost.x - h.x, ghost.y - h.y);
           const ang = Math.atan2(ghost.y - h.y, ghost.x - h.x);
           const diff = Math.abs(Math.atan2(Math.sin(ang - h.angle), Math.cos(ang - h.angle)));
-          if (dist <= range && diff <= spread) ghost.lit = true;
+          // A luz da lanterna NÃO atravessa paredes!
+          if (dist <= range && diff <= spread && hasLineOfSight(h.x, h.y, ghost.x, ghost.y, hostEngine.walls)) {
+            ghost.lit = true;
+          }
         }
         for (const ally of pList.filter(a => a.role === 'hunter' && a.frozen && a.id !== h.id)) {
           const dist = Math.hypot(ally.x - h.x, ally.y - h.y);
           const ang = Math.atan2(ally.y - h.y, ally.x - h.x);
           const diff = Math.abs(Math.atan2(Math.sin(ang - h.angle), Math.cos(ang - h.angle)));
-          if (dist < 58 || (dist < 230 && diff <= spread)) {
+          if (dist < 48 || (dist < 230 && diff <= spread && hasLineOfSight(h.x, h.y, ally.x, ally.y, hostEngine.walls))) {
             ally.rescueProgress += 65 * dt;
             if (ally.rescueProgress >= 100) {
               ally.frozen = false;
@@ -1499,7 +1578,7 @@
               scaring: false,
               timer: 6.0
             });
-            hostEngine.toast = '👥 O Fantasma invocou um Clone Assustador!';
+            hostEngine.toast = '👥 O Fantasma invocou um Clone Ilusório!';
             hostEngine.toastTimer = 2.8;
           }
           if (!isStunned && pl.ghostSkill4 && pl.dashCooldown <= 0) {
@@ -1530,15 +1609,17 @@
           if (isStunned) {
             pl.moving = false;
           } else {
-            const baseSpeed = pl.phaseTimer > 0 ? 250 : 220;
-            const speed = pl.lit ? 120 : baseSpeed;
+            // O Fantasma é mais lento que os caçadores (180 base, 205 astral, 95 sob a luz da lanterna!)
+            const baseSpeed = pl.phaseTimer > 0 ? 205 : 180;
+            const speed = pl.lit ? 95 : baseSpeed;
             const len = Math.hypot(pl.dx, pl.dy);
             pl.moving = len > 0.1;
             moveHostPlayer(pl, len > 0.01 ? (pl.dx / Math.max(1, len)) * speed * dt : 0, len > 0.01 ? (pl.dy / Math.max(1, len)) * speed * dt : 0, pl.phaseTimer > 0);
           }
         } else {
           if (pl.frozen) { pl.moving = false; continue; }
-          const speed = pl.turbo ? 172 : 198;
+          // Caçador é mais rápido que o fantasma: 210 base, 240 com turbo/corrida!
+          const speed = pl.turbo ? 240 : 210;
           const len = Math.hypot(pl.dx, pl.dy);
           pl.moving = len > 0.15;
           moveHostPlayer(pl, len > 0.01 ? (pl.dx / Math.max(1, len)) * speed * dt : 0, len > 0.01 ? (pl.dy / Math.max(1, len)) * speed * dt : 0, false);
@@ -2067,7 +2148,7 @@
         ctx.strokeRect(w.x, w.y, w.w, w.h);
       });
 
-      // Fachos de Luz das Lanternas
+      // Fachos de Luz das Lanternas (NÃO ATRAVESSAM PAREDES! Raycasting de Iluminação)
       const blackoutActive = (gameState.blackoutTimer || 0) > 0;
       gameState.players.forEach(p => {
         if (p.role !== 'hunter' || p.frozen || (p.battery || 0) <= 0) return;
@@ -2075,6 +2156,9 @@
         const aimAngle = (p.id === clientId) ? inputState.angle : rp.angle;
         const range = blackoutActive ? 150 : (p.turbo ? 350 : 275);
         const spread = p.turbo ? 0.56 : 0.43;
+
+        // Calcula o cone de luz que é bloqueado perfeitamente pelas paredes
+        const conePoints = computeLightConePolygon(rp.x, rp.y, aimAngle, spread, range, gameState.walls || []);
 
         ctx.save();
         const grad = ctx.createRadialGradient(rp.x, rp.y, 12, rp.x, rp.y, range);
@@ -2084,7 +2168,9 @@
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.moveTo(rp.x, rp.y);
-        ctx.arc(rp.x, rp.y, range, aimAngle - spread, aimAngle + spread);
+        for (let i = 0; i < conePoints.length; i++) {
+          ctx.lineTo(conePoints[i].x, conePoints[i].y);
+        }
         ctx.closePath();
         ctx.fill();
         ctx.restore();
@@ -2120,7 +2206,9 @@
         if (p.role === 'ghost') {
           const distToMe = me ? Math.hypot(rp.x - (renderPlayers[me.id]?.x || me.x), rp.y - (renderPlayers[me.id]?.y || me.y)) : 999;
           const stunnedG = (p.stunTimer || 0) > 0;
-          if (!isGhostView && !p.lit && !stunnedG && distToMe > 95) return;
+          const hasLos = me ? hasLineOfSight(renderPlayers[me.id]?.x || me.x, renderPlayers[me.id]?.y || me.y, rp.x, rp.y, gameState.walls || []) : false;
+          // O Caçador só vê o Fantasma se: estiver no mesmo papel OU o Fantasma estiver aceso por lanterna OU travado OU a menos de 95px COM linha de visão direta (sem paredes)!
+          if (!isGhostView && !p.lit && !stunnedG && (!hasLos || distToMe > 95)) return;
 
           ctx.save();
           if (p.phaseTimer > 0) ctx.globalAlpha = 0.55;
@@ -2197,7 +2285,8 @@
         if (p.role === 'ghost') {
           const distToMe = me ? Math.hypot(rp.x - (renderPlayers[me.id]?.x || me.x), rp.y - (renderPlayers[me.id]?.y || me.y)) : 999;
           const stunnedTag = (p.stunTimer || 0) > 0;
-          if (!isGhostView && !p.lit && !stunnedTag && distToMe > 95) return;
+          const hasLos = me ? hasLineOfSight(renderPlayers[me.id]?.x || me.x, renderPlayers[me.id]?.y || me.y, rp.x, rp.y, gameState.walls || []) : false;
+          if (!isGhostView && !p.lit && !stunnedTag && (!hasLos || distToMe > 95)) return;
           if (stunnedTag) {
             drawTagPill(ctx, `⛓️ TRAVADO! (${p.stunTimer.toFixed(1)}s)`, rp.x, rp.y - 42, '#67e8f9');
           } else {
@@ -2208,7 +2297,7 @@
         }
       });
 
-      // Fog of War (Para Caçadores)
+      // Fog of War (Para Caçadores - A luz da lanterna NÃO abre além das paredes!)
       if (!isGhostView && me) {
         fogCtx.clearRect(0, 0, W, H);
         fogCtx.globalCompositeOperation = 'source-over';
@@ -2230,6 +2319,8 @@
             const aimAngle = (p.id === clientId) ? inputState.angle : rp.angle;
             const range = blackoutActive ? 150 : (p.turbo ? 350 : 275);
             const spread = p.turbo ? 0.58 : 0.45;
+            const conePoints = computeLightConePolygon(rp.x, rp.y, aimAngle, spread, range, gameState.walls || []);
+
             const coneGrad = fogCtx.createRadialGradient(rp.x, rp.y, 10, rp.x, rp.y, range);
             coneGrad.addColorStop(0, 'rgba(0,0,0,1)');
             coneGrad.addColorStop(0.85, 'rgba(0,0,0,0.92)');
@@ -2237,7 +2328,9 @@
             fogCtx.fillStyle = coneGrad;
             fogCtx.beginPath();
             fogCtx.moveTo(rp.x, rp.y);
-            fogCtx.arc(rp.x, rp.y, range, aimAngle - spread, aimAngle + spread);
+            for (let i = 0; i < conePoints.length; i++) {
+              fogCtx.lineTo(conePoints[i].x, conePoints[i].y);
+            }
             fogCtx.closePath();
             fogCtx.fill();
           }
