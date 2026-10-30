@@ -646,12 +646,30 @@
       }
     ];
 
-    const clientId = sessionStorage.getItem('fm_client_id') || ('p_' + Math.random().toString(36).substring(2, 9));
-    sessionStorage.setItem('fm_client_id', clientId);
+    // Armazenamento com proteção para qualquer navegador (modo anônimo / GitHub Pages / cookies bloqueados)
+    function safeStorageGet(storageName, key, fallback) {
+      try {
+        const store = window[storageName];
+        if (!store) return fallback;
+        const val = store.getItem(key);
+        return val !== null && val !== undefined ? val : fallback;
+      } catch (e) {
+        return fallback;
+      }
+    }
+    function safeStorageSet(storageName, key, val) {
+      try {
+        const store = window[storageName];
+        if (store) store.setItem(key, val);
+      } catch (e) {}
+    }
+
+    const clientId = safeStorageGet('sessionStorage', 'fm_client_id', 'p_' + Math.random().toString(36).substring(2, 9));
+    safeStorageSet('sessionStorage', 'fm_client_id', clientId);
 
     const defaultName = isTouchDevice ? 'Caçador ' + Math.floor(10 + Math.random() * 89) : 'Papai (Notebook)';
-    let myName = localStorage.getItem('fm_player_name') || defaultName;
-    let myRole = localStorage.getItem('fm_player_role') || (isTouchDevice ? 'hunter' : 'ghost');
+    let myName = safeStorageGet('localStorage', 'fm_player_name', defaultName);
+    let myRole = safeStorageGet('localStorage', 'fm_player_role', isTouchDevice ? 'hunter' : 'ghost');
 
     const inputState = {
       dx: 0, dy: 0, angle: 0,
@@ -677,26 +695,6 @@
     let peer = null;
     let hostConn = null;
     let clientConns = {};
-
-    function initGameApp() {
-      const pNameInput = document.getElementById('player-name');
-      if (pNameInput) pNameInput.value = myName;
-      updateRoleButtonsUI();
-      setupKeyboardAndMouse();
-      setupTouchJoysticks();
-      startGameLoop();
-      requestAnimationFrame(renderLoop);
-      tryAutoJoinFromUrl();
-      if (typeof hostEngine !== 'undefined' && hostEngine.players) {
-        renderLobbyPlayers(Object.values(hostEngine.players));
-      }
-    }
-
-    if (document.readyState === 'loading') {
-      window.addEventListener('DOMContentLoaded', initGameApp);
-    } else {
-      initGameApp();
-    }
 
     // ========================================================================
     // ATALHOS DE TECLADO NO PC + MOUSE
@@ -730,6 +728,7 @@
       });
 
       const canvas = document.getElementById('game-canvas');
+      if (!canvas) return;
       canvas.addEventListener('mousemove', (e) => {
         if (!gameState || !gameState.players) return;
         const me = gameState.players.find(p => p.id === clientId);
@@ -787,6 +786,7 @@
       const leftKnob = document.getElementById('stick-left-knob');
       const rightZone = document.getElementById('stick-right-zone');
       const rightKnob = document.getElementById('stick-right-knob');
+      if (!leftZone || !leftKnob || !rightZone || !rightKnob) return;
 
       function handleStick(zone, knob, clientX, clientY, isRight) {
         const rect = zone.getBoundingClientRect();
@@ -1069,7 +1069,7 @@
       const input = document.getElementById('player-name');
       if (input && input.value.trim()) {
         myName = input.value.trim().substring(0, 14);
-        localStorage.setItem('fm_player_name', myName);
+        safeStorageSet('localStorage', 'fm_player_name', myName);
       }
     };
 
@@ -1077,7 +1077,7 @@
       ensureAudio();
       tryAutoFullscreen();
       myRole = role;
-      localStorage.setItem('fm_player_role', myRole);
+      safeStorageSet('localStorage', 'fm_player_role', myRole);
       updateRoleButtonsUI();
       pendingCommands.push({ action: 'set_role', role: myRole });
     };
@@ -2688,6 +2688,51 @@
       return String(str).replace(/[&<>"']/g, s => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[s]));
+    }
+
+    // ========================================================================
+    // INICIALIZAÇÃO DEFINITIVA DA APLICAÇÃO (APÓS TODAS AS FUNÇÕES E MOTORES)
+    // ========================================================================
+    function initGameApp() {
+      try {
+        const pNameInput = document.getElementById('player-name');
+        if (pNameInput) pNameInput.value = myName;
+        updateRoleButtonsUI();
+      } catch (e) {
+        console.warn('Erro ao atualizar UI do perfil:', e);
+      }
+
+      try {
+        setupKeyboardAndMouse();
+        setupTouchJoysticks();
+      } catch (e) {
+        console.warn('Erro ao configurar controles:', e);
+      }
+
+      try {
+        startGameLoop();
+        requestAnimationFrame(renderLoop);
+      } catch (e) {
+        console.warn('Erro ao iniciar loops:', e);
+      }
+
+      try {
+        tryAutoJoinFromUrl();
+      } catch (e) {}
+
+      try {
+        if (hostEngine && hostEngine.players) {
+          renderLobbyPlayers(Object.values(hostEngine.players));
+        }
+      } catch (e) {
+        console.error('Erro ao renderizar lobby:', e);
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', initGameApp);
+    } else {
+      initGameApp();
     }
   </script>
 </body>
