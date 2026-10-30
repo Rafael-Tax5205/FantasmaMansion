@@ -127,6 +127,14 @@
                 ▶ INICIAR PARTIDA (TELA CHEIA)
               </button>
             </div>
+            <!-- Botão Arte Conceitual Labirinto 3D -->
+            <div class="mt-3">
+              <button onclick="openConceptModal()"
+                class="w-full py-2 px-3 rounded-xl bg-indigo-950/70 hover:bg-indigo-900 border border-indigo-500/40 text-indigo-200 font-bold text-xs transition flex items-center justify-center gap-2 shadow-md">
+                <span>🎨</span>
+                <span>Ver Arte Conceitual: Labirinto 3D (Visão Caçador & Fantasma)</span>
+              </button>
+            </div>
           </div>
 
         </div>
@@ -140,19 +148,19 @@
             <div class="space-y-1.5 text-zinc-300">
               <div class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-between">
                 <span>🏰 <strong>Fase 1:</strong> Mansão Gótica</span>
-                <span class="text-amber-300 font-semibold">8 Tesouros 💎</span>
+                <span class="text-amber-300 font-semibold">8 Tesouros 💎 + 2 Geradores ⚡</span>
               </div>
               <div class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-between">
                 <span>🏥 <strong>Fase 2:</strong> Hospital Abandonado</span>
-                <span class="text-sky-300 font-semibold">8 Tesouros 💎</span>
+                <span class="text-sky-300 font-semibold">8 Tesouros 💎 + 2 Geradores ⚡</span>
               </div>
               <div class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-between">
                 <span>🌲 <strong>Fase 3:</strong> Catacumbas & Cemitério</span>
-                <span class="text-emerald-300 font-semibold">8 Tesouros 💎</span>
+                <span class="text-emerald-300 font-semibold">8 Tesouros 💎 + 2 Geradores ⚡</span>
               </div>
             </div>
             <p class="text-[11px] text-zinc-400 pt-1">
-              🏆 <strong>Regra:</strong> Recolham <strong>TODOS os 8 tesouros</strong>! Cada Caçador também tem <strong>1 botão ⛓️ Travar (3s)</strong> para congelar o Fantasma!
+              🏆 <strong>Missões:</strong> Recolham os <strong>8 tesouros</strong> e liguem os <strong>2 Geradores ⚡</strong> para iluminar a mansão! Caçadores têm <strong>1 botão ⛓️ Trava (3s)</strong>. O Fantasma agora tem <strong>visão dinâmica limitada</strong>!
             </p>
           </div>
 
@@ -211,6 +219,10 @@
         <span id="hud-stage-name" class="text-xs font-extrabold text-amber-300">🏰 Fase 1</span>
         <span class="text-zinc-700">|</span>
         <span id="hud-role-badge" class="text-xs font-bold text-purple-400">👻 Fantasma</span>
+        <span class="text-zinc-700">|</span>
+        <span class="text-xs font-semibold text-emerald-400">
+          ⚡ Geradores: <strong id="hud-generators">0/2</strong>
+        </span>
         <span class="text-zinc-700">|</span>
         <span class="text-xs font-semibold text-sky-300">
           💎 Tesouros: <strong id="hud-relics">0/8</strong>
@@ -363,6 +375,56 @@
       </div>
     </div>
 
+    <!-- Modal Arte Conceitual: Labirinto 3D (Apenas Visualização) -->
+    <div id="concept-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+      <div class="bg-zinc-900 border border-zinc-700 rounded-2xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl flex flex-col gap-4 my-auto">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">🎨</span>
+            <div>
+              <h2 class="text-base sm:text-lg font-black text-amber-300">Arte Conceitual: Labirinto 3D</h2>
+              <p class="text-[11px] text-zinc-400">Estudo de perspectiva visual para Caçadores (1ª Pessoa) e Fantasma (Isométrica Espectral)</p>
+            </div>
+          </div>
+          <button onclick="closeConceptModal()" class="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white flex items-center justify-center font-bold text-sm">✕</button>
+        </div>
+
+        <!-- Seletor de Visão Conceitual (Abas) -->
+        <div class="flex gap-2">
+          <button id="tab-hunter-3d" onclick="switchConceptTab('hunter')"
+            class="flex-1 py-2 px-3 rounded-xl bg-amber-500/20 border border-amber-400/80 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition">
+            <span>🔦</span>
+            <span>1ª Pessoa: Visão do Caçador</span>
+          </button>
+          <button id="tab-ghost-3d" onclick="switchConceptTab('ghost')"
+            class="flex-1 py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 font-bold text-xs flex items-center justify-center gap-2 transition">
+            <span>👻</span>
+            <span>Isométrica: Visão do Fantasma</span>
+          </button>
+        </div>
+
+        <!-- Área de Renderização Conceitual Interativa -->
+        <div class="relative w-full h-64 sm:h-80 bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden flex items-center justify-center shadow-inner">
+          <canvas id="concept-canvas" width="800" height="420" class="w-full h-full object-contain"></canvas>
+          <div id="concept-canvas-badge" class="absolute bottom-2.5 left-3 px-2.5 py-1 rounded bg-black/75 border border-white/10 text-[11px] text-zinc-300 backdrop-blur-sm">
+            🔦 Lanterna volumétrica cortando o corredor escuro
+          </div>
+        </div>
+
+        <!-- Descrição Técnica e Comparativa da Perspectiva -->
+        <div id="concept-description" class="bg-zinc-950 border border-zinc-800 rounded-xl p-3.5 text-xs text-zinc-300 space-y-2">
+          <!-- Injetado dinamicamente via JS switchConceptTab() -->
+        </div>
+
+        <div class="flex justify-between items-center pt-1 border-t border-zinc-800 text-xs">
+          <span class="text-zinc-500 text-[11px]">💡 Esta é apenas uma demonstração conceitual (o jogo atual continua rápido em 2D).</span>
+          <button onclick="closeConceptModal()" class="px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-semibold">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -446,6 +508,12 @@
         treasureSpots: [
           [120, 95], [340, 210], [1480, 95], [1260, 210],
           [800, 460], [120, 750], [1480, 750], [510, 420]
+        ],
+        ghostSpawn: [800, 95],
+        hunterSpawns: [[740, 740], [800, 740], [860, 740], [800, 690]],
+        generators: [
+          { id: 1, x: 260, y: 190, name: 'Gerador da Biblioteca' },
+          { id: 2, x: 1340, y: 640, name: 'Gerador da Cripta' }
         ]
       },
       {
@@ -499,6 +567,12 @@
         treasureSpots: [
           [110, 165], [380, 165], [1490, 165], [1220, 165],
           [640, 420], [960, 420], [110, 745], [1490, 745]
+        ],
+        ghostSpawn: [800, 175],
+        hunterSpawns: [[740, 740], [800, 740], [860, 740], [800, 690]],
+        generators: [
+          { id: 1, x: 230, y: 160, name: 'Gerador da UTI' },
+          { id: 2, x: 1370, y: 680, name: 'Gerador do Necrotério' }
         ]
       },
       {
@@ -544,6 +618,12 @@
         treasureSpots: [
           [110, 160], [510, 120], [1490, 160], [1090, 120],
           [660, 420], [940, 420], [110, 690], [1490, 690]
+        ],
+        ghostSpawn: [800, 145],
+        hunterSpawns: [[740, 740], [800, 740], [860, 740], [800, 690]],
+        generators: [
+          { id: 1, x: 200, y: 150, name: 'Gerador da Capela' },
+          { id: 2, x: 1400, y: 700, name: 'Gerador do Túmulo' }
         ]
       }
     ];
@@ -1133,7 +1213,9 @@
       }
 
       let hIdx = 0;
-      const spawns = [[720, 740], [800, 740], [880, 740], [800, 690]];
+      const defaultSpawns = [[720, 740], [800, 740], [880, 740], [800, 690]];
+      const hSpawns = stage.hunterSpawns || defaultSpawns;
+
       for (const p of Object.values(hostEngine.players)) {
         p.frozen = false; p.rescueProgress = 0; p.battery = 100; p.lit = false;
         p.stunCharges = p.role === 'hunter' ? 1 : 0;
@@ -1142,8 +1224,15 @@
         p.blackoutCooldown = 0; p.cloneCooldown = 0; p.dashCooldown = 0;
         p.treasuresFound = 0;
         if (typeof p.score !== 'number') p.score = 0;
-        if (p.role === 'ghost') { p.x = 800; p.y = 85; }
-        else { p.x = spawns[hIdx % 4][0]; p.y = spawns[hIdx % 4][1]; hIdx++; }
+        if (p.role === 'ghost') {
+          p.x = stage.ghostSpawn ? stage.ghostSpawn[0] : 800;
+          p.y = stage.ghostSpawn ? stage.ghostSpawn[1] : 110;
+        } else {
+          p.x = hSpawns[hIdx % hSpawns.length][0];
+          p.y = hSpawns[hIdx % hSpawns.length][1];
+          hIdx++;
+        }
+        unstickPlayer(p);
       }
 
       hostEngine.relics = stage.treasureSpots.map((s, i) => ({
@@ -1151,25 +1240,75 @@
       }));
       hostEngine.relicsCollected = 0;
       hostEngine.relicsTarget = hostEngine.relics.length;
+
+      // Inicializa os 2 Geradores de Energia da Fase
+      hostEngine.generators = (stage.generators || []).map(g => ({
+        id: g.id,
+        name: g.name,
+        x: g.x,
+        y: g.y,
+        progress: 0,
+        completed: false
+      }));
+      hostEngine.generatorsActive = 0;
+
       hostEngine.clones = [];
       hostEngine.timeLeft = 180;
       hostEngine.blackoutTimer = 0;
       hostEngine.botStunCooldown = 6.0;
       hostEngine.status = 'playing';
-      hostEngine.toast = `🎲 ${stage.name}! Cada Caçador tem 1 trava de 3s (⛓️) contra o Fantasma!`;
-      hostEngine.toastTimer = 3.8;
+      hostEngine.toast = `🎲 ${stage.name}! Ativem os Geradores ⚡ e peguem os Tesouros 💎!`;
+      hostEngine.toastTimer = 4.0;
+    }
+
+    // ========================================================================
+    // SISTEMA ANTI-TRAVAMENTO EM PAREDES (UNSTICK & SAFE COLLISION)
+    // ========================================================================
+    function isCollidingWithWall(cx, cy, r = 16, ignoreInner = false) {
+      if (cx - r < 20 || cx + r > MAP_W - 20 || cy - r < 20 || cy + r > MAP_H - 20) return true;
+      const walls = hostEngine.walls || [];
+      for (let i = 0; i < walls.length; i++) {
+        const w = walls[i];
+        if (ignoreInner && !w.border) continue;
+        const kx = Math.max(w.x, Math.min(cx, w.x + w.w));
+        const ky = Math.max(w.y, Math.min(cy, w.y + w.h));
+        if (Math.hypot(cx - kx, cy - ky) < r) return true;
+      }
+      return false;
+    }
+
+    function unstickPlayer(p, r = 16) {
+      if (!isCollidingWithWall(p.x, p.y, r, false)) return;
+      const angles = [0, Math.PI/4, Math.PI/2, 3*Math.PI/4, Math.PI, -3*Math.PI/4, -Math.PI/2, -Math.PI/4,
+                      Math.PI/8, 3*Math.PI/8, 5*Math.PI/8, 7*Math.PI/8, -Math.PI/8, -3*Math.PI/8, -5*Math.PI/8, -7*Math.PI/8];
+      for (let dist = 6; dist <= 160; dist += 6) {
+        for (let i = 0; i < angles.length; i++) {
+          const a = angles[i];
+          const testX = Math.max(28, Math.min(MAP_W - 28, p.x + Math.cos(a) * dist));
+          const testY = Math.max(28, Math.min(MAP_H - 28, p.y + Math.sin(a) * dist));
+          if (!isCollidingWithWall(testX, testY, r, false)) {
+            p.x = testX;
+            p.y = testY;
+            return;
+          }
+        }
+      }
+      const stage = STAGES[hostEngine.stageIndex || 0] || STAGES[0];
+      if (p.role === 'ghost') {
+        p.x = stage.ghostSpawn ? stage.ghostSpawn[0] : 800;
+        p.y = stage.ghostSpawn ? stage.ghostSpawn[1] : 110;
+      } else {
+        const sList = stage.hunterSpawns || [[800, 740]];
+        p.x = sList[0][0];
+        p.y = sList[0][1];
+      }
     }
 
     function moveHostPlayer(p, vx, vy, ignoreInner) {
       const r = 16;
-      const collide = (cx, cy) => hostEngine.walls.some(w => {
-        if (ignoreInner && !w.border) return false;
-        const kx = Math.max(w.x, Math.min(cx, w.x + w.w));
-        const ky = Math.max(w.y, Math.min(cy, w.y + w.h));
-        return Math.hypot(cx - kx, cy - ky) < r;
-      });
-      if (!collide(p.x + vx, p.y)) p.x = Math.max(28, Math.min(MAP_W - 28, p.x + vx));
-      if (!collide(p.x, p.y + vy)) p.y = Math.max(28, Math.min(MAP_H - 28, p.y + vy));
+      if (!isCollidingWithWall(p.x + vx, p.y, r, ignoreInner)) p.x = Math.max(28, Math.min(MAP_W - 28, p.x + vx));
+      if (!isCollidingWithWall(p.x, p.y + vy, r, ignoreInner)) p.y = Math.max(28, Math.min(MAP_H - 28, p.y + vy));
+      if (!ignoreInner) unstickPlayer(p, r);
     }
 
     function stepHostSimulation(dt) {
@@ -1328,7 +1467,12 @@
             if (pl.stunTimer <= 0) pl.stunnedBy = '';
           }
           if (pl.phaseCooldown > 0) pl.phaseCooldown = Math.max(0, pl.phaseCooldown - dt);
-          if (pl.phaseTimer > 0) pl.phaseTimer = Math.max(0, pl.phaseTimer - dt);
+          if (pl.phaseTimer > 0) {
+            pl.phaseTimer = Math.max(0, pl.phaseTimer - dt);
+            if (pl.phaseTimer <= 0) {
+              unstickPlayer(pl); // Anti-Stuck: Ejeção imediata para fora de paredes ao fim da Forma Astral!
+            }
+          }
           if (pl.blackoutCooldown > 0) pl.blackoutCooldown = Math.max(0, pl.blackoutCooldown - dt);
           if (pl.cloneCooldown > 0) pl.cloneCooldown = Math.max(0, pl.cloneCooldown - dt);
           if (pl.dashCooldown > 0) pl.dashCooldown = Math.max(0, pl.dashCooldown - dt);
@@ -1361,9 +1505,23 @@
           if (!isStunned && pl.ghostSkill4 && pl.dashCooldown <= 0) {
             pl.dashCooldown = 11.0;
             const dashAng = Math.hypot(pl.dx, pl.dy) > 0.1 ? Math.atan2(pl.dy, pl.dx) : pl.angle;
-            pl.x = Math.max(35, Math.min(MAP_W - 35, pl.x + Math.cos(dashAng) * 230));
-            pl.y = Math.max(35, Math.min(MAP_H - 35, pl.y + Math.sin(dashAng) * 230));
-            hostEngine.toast = '⚡ Salto Sombrio! O Fantasma teleportou!';
+            const isAstral = (pl.phaseTimer || 0) > 0;
+            let targetX = pl.x;
+            let targetY = pl.y;
+            // Raycast seguro: avança até 230px sem entrar dentro de paredes sólidas
+            for (let step = 10; step <= 230; step += 10) {
+              const nx = Math.max(35, Math.min(MAP_W - 35, pl.x + Math.cos(dashAng) * step));
+              const ny = Math.max(35, Math.min(MAP_H - 35, pl.y + Math.sin(dashAng) * step));
+              if (!isAstral && isCollidingWithWall(nx, ny, 18, false)) {
+                break;
+              }
+              targetX = nx;
+              targetY = ny;
+            }
+            pl.x = targetX;
+            pl.y = targetY;
+            unstickPlayer(pl);
+            hostEngine.toast = '⚡ Salto Sombrio! O Fantasma teleportou com segurança!';
             hostEngine.toastTimer = 2.5;
           }
 
@@ -1385,6 +1543,7 @@
           pl.moving = len > 0.15;
           moveHostPlayer(pl, len > 0.01 ? (pl.dx / Math.max(1, len)) * speed * dt : 0, len > 0.01 ? (pl.dy / Math.max(1, len)) * speed * dt : 0, false);
 
+          // Coleta de Tesouros
           for (const rel of hostEngine.relics) {
             if (!rel.collected && Math.hypot(rel.x - pl.x, rel.y - pl.y) < 30) {
               rel.collected = true;
@@ -1396,6 +1555,28 @@
                 ? `💎 ${pl.name} recolheu um Tesouro! (+100 pts • Faltam ${faltam})`
                 : `🏆 TODOS os Tesouros foram recolhidos!`;
               hostEngine.toastTimer = 3.0;
+            }
+          }
+
+          // Ativação dos Geradores de Energia (Caçadores perto < 48px religam)
+          if (hostEngine.generators) {
+            for (const gen of hostEngine.generators) {
+              if (gen.completed) continue;
+              if (Math.hypot(gen.x - pl.x, gen.y - pl.y) < 48) {
+                gen.progress = Math.min(100, (gen.progress || 0) + 28 * dt);
+                if (gen.progress >= 100) {
+                  gen.completed = true;
+                  hostEngine.generatorsActive = (hostEngine.generatorsActive || 0) + 1;
+                  pl.score = (pl.score || 0) + 200;
+                  if (hostEngine.generatorsActive >= hostEngine.generators.length) {
+                    hostEngine.toast = `💡 ENERGIA RESTAURADA! Lanternas e visão dos Caçadores ampliadas!`;
+                    hostEngine.toastTimer = 4.2;
+                  } else {
+                    hostEngine.toast = `⚡ ${pl.name} ativou o ${gen.name}! (+200 pts • Faltam ${hostEngine.generators.length - hostEngine.generatorsActive})`;
+                    hostEngine.toastTimer = 3.2;
+                  }
+                }
+              }
             }
           }
           // O Fantasma só congela Caçadores se NÃO estiver travado pelos 3 segundos
@@ -1472,6 +1653,8 @@
             blackoutTimer: hostEngine.blackoutTimer,
             relicsCollected: hostEngine.relicsCollected,
             relicsTarget: hostEngine.relicsTarget,
+            generatorsActive: hostEngine.generatorsActive || 0,
+            generators: hostEngine.generators || [],
             players: Object.values(hostEngine.players),
             clones: hostEngine.clones,
             relics: hostEngine.relics,
@@ -1595,6 +1778,11 @@
       if (!me) return;
 
       document.getElementById('hud-stage-name').textContent = state.stageName || '🏰 Fase 1';
+      const genEl = document.getElementById('hud-generators');
+      if (genEl) {
+        const totalGen = (state.generators || []).length || 2;
+        genEl.textContent = `${state.generatorsActive || 0}/${totalGen}`;
+      }
       document.getElementById('hud-relics').textContent = `${state.relicsCollected}/${state.relicsTarget}`;
       document.getElementById('hud-score').textContent = `${me.score || 0} pts`;
 
@@ -1713,10 +1901,12 @@
     const fogCtx = fogCanvas.getContext('2d');
 
     // ========================================================================
-    // CÂMERA: Fantasma = visão panorâmica (mapa inteiro)
-    //         Caçadores = visão fechada com zoom, seguindo o próprio jogador
+    // CÂMERA DINÂMICA:
+    // - Caçador: Visão fechada com zoom alto (2.0x PC / 2.3x Celular)
+    // - Fantasma: Visão dinâmica limitada (1.35x PC / 1.45x Celular) acompanhando o Fantasma!
     // ========================================================================
     const HUNTER_ZOOM = isTouchDevice ? 2.3 : 2.0;
+    const GHOST_ZOOM = isTouchDevice ? 1.45 : 1.35;
     const camera = { x: MAP_W / 2, y: MAP_H / 2, zoom: 1 };
 
     function drawTagPill(ctx, text, x, y, textColor) {
@@ -1756,13 +1946,13 @@
       });
 
       // Piso temático da Fase
-      // --- Câmera ---
+      // --- Câmera com Suavização e Limitação de Visão para Fantasma & Caçador ---
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = '#05050a';
       ctx.fillRect(0, 0, W, H);
-      if (!isGhostView && me) {
+      if (me) {
         const rpMe = renderPlayers[me.id] || me;
-        const targetZoom = HUNTER_ZOOM;
+        const targetZoom = isGhostView ? GHOST_ZOOM : HUNTER_ZOOM;
         camera.zoom += (targetZoom - camera.zoom) * 0.15;
         const halfW = W / (2 * camera.zoom);
         const halfH = H / (2 * camera.zoom);
@@ -1799,6 +1989,52 @@
         ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#34d399';
         ctx.textAlign = 'center';
         ctx.fillText('🔋 RECARGA', st.x, st.y + 4);
+        ctx.restore();
+      });
+
+      // Geradores de Energia dos Caçadores ⚡ (Objetivo Extra!)
+      (gameState.generators || []).forEach(gen => {
+        ctx.save();
+        const active = gen.completed;
+        const pVal = (gen.progress || 0) / 100;
+        
+        // Aura pulsante do Gerador
+        const gAura = ctx.createRadialGradient(gen.x, gen.y, 4, gen.x, gen.y, active ? 36 : 28);
+        gAura.addColorStop(0, active ? 'rgba(52, 211, 153, 0.85)' : (pVal > 0 ? 'rgba(251, 191, 36, 0.75)' : 'rgba(14, 165, 233, 0.45)'));
+        gAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = gAura;
+        ctx.beginPath(); ctx.arc(gen.x, gen.y, active ? 36 : 28, 0, Math.PI * 2); ctx.fill();
+
+        // Caixa de Força Estilizada
+        ctx.fillStyle = active ? '#064e3b' : '#1e293b';
+        ctx.strokeStyle = active ? '#10b981' : (pVal > 0 ? '#f59e0b' : '#38bdf8');
+        ctx.lineWidth = 2.5;
+        ctx.fillRect(gen.x - 14, gen.y - 14, 28, 28);
+        ctx.strokeRect(gen.x - 14, gen.y - 14, 28, 28);
+
+        // Ícone de Raio
+        ctx.fillStyle = active ? '#34d399' : (pVal > 0 ? '#fbbf24' : '#7dd3fc');
+        ctx.font = 'bold 15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⚡', gen.x, gen.y);
+
+        // Barra circular de progresso (quando caçadores estão perto ativando)
+        if (!active) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(gen.x, gen.y, 22, 0, Math.PI * 2); ctx.stroke();
+          if (pVal > 0) {
+            ctx.strokeStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(gen.x, gen.y, 22, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * pVal));
+            ctx.stroke();
+          }
+        }
+        
+        // Etiqueta do Gerador com status
+        const tagText = active ? `⚡ ${gen.name} (LIGADO)` : (pVal > 0 ? `⚡ ATIVANDO... ${Math.round(pVal * 100)}%` : `⚡ ${gen.name}`);
+        drawTagPill(ctx, tagText, gen.x, gen.y - 24, active ? '#34d399' : '#38bdf8');
         ctx.restore();
       });
 
@@ -2063,6 +2299,37 @@
           }
         });
 
+        // Setas Guia para os Geradores que faltam ativar ⚡
+        const uncompletedGenerators = (gameState.generators || []).filter(g => !g.completed);
+        uncompletedGenerators.forEach(gen => {
+          const sx = (gen.x - camera.x) * camera.zoom + W / 2;
+          const sy = (gen.y - camera.y) * camera.zoom + H / 2;
+          const margin = 42;
+          if (sx < margin || sx > W - margin || sy < margin || sy > H - margin) {
+            const angleToGen = Math.atan2(gen.y - rpMe.y, gen.x - rpMe.x);
+            const edgeX = Math.max(margin, Math.min(W - margin, W / 2 + Math.cos(angleToGen) * (W / 2 - margin)));
+            const edgeY = Math.max(margin, Math.min(H - margin, H / 2 + Math.sin(angleToGen) * (H / 2 - margin)));
+            const distM = Math.round(Math.hypot(gen.x - rpMe.x, gen.y - rpMe.y) / 10);
+
+            ctx.save();
+            ctx.translate(edgeX, edgeY);
+            ctx.rotate(angleToGen);
+            ctx.fillStyle = '#34d399';
+            ctx.shadowColor = '#10b981';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.moveTo(14, 0);
+            ctx.lineTo(-6, -8);
+            ctx.lineTo(-2, 0);
+            ctx.lineTo(-6, 8);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            drawTagPill(ctx, `⚡ ${gen.name} (${distM}m)`, edgeX, edgeY + 16, '#34d399');
+          }
+        });
+
         // Alerta na borda se um colega estiver congelado precisando de resgate!
         const frozenAllies = (gameState.players || []).filter(p => p.role === 'hunter' && p.frozen && p.id !== me.id);
         frozenAllies.forEach(ally => {
@@ -2094,6 +2361,319 @@
           }
         });
       }
+    }
+
+    // ========================================================================
+    // ARTE CONCEITUAL: LABIRINTO 3D (VISUALIZADOR & ILUSTRAÇÃO CONCEITUAL)
+    // ========================================================================
+    let conceptCurrentTab = 'hunter';
+    let conceptAnimId = null;
+
+    window.openConceptModal = function() {
+      const modal = document.getElementById('concept-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      switchConceptTab('hunter');
+    };
+
+    window.closeConceptModal = function() {
+      const modal = document.getElementById('concept-modal');
+      if (modal) modal.classList.add('hidden');
+      if (conceptAnimId) {
+        cancelAnimationFrame(conceptAnimId);
+        conceptAnimId = null;
+      }
+    };
+
+    window.switchConceptTab = function(tab) {
+      conceptCurrentTab = tab;
+      const tabH = document.getElementById('tab-hunter-3d');
+      const tabG = document.getElementById('tab-ghost-3d');
+      const descEl = document.getElementById('concept-description');
+      const badgeEl = document.getElementById('concept-canvas-badge');
+
+      if (tab === 'hunter') {
+        tabH.className = 'flex-1 py-2 px-3 rounded-xl bg-amber-500/20 border border-amber-400 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition';
+        tabG.className = 'flex-1 py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 font-bold text-xs flex items-center justify-center gap-2 transition hover:text-white';
+        badgeEl.textContent = '🔦 Visão do Caçador em 1ª Pessoa 3D • Lanterna Volumétrica & Corredores Estreitos';
+        descEl.innerHTML = `
+          <div class="flex items-start gap-2">
+            <span class="text-amber-400 text-base">👁️</span>
+            <div>
+              <strong class="text-amber-300">Imersão em Primeira Pessoa (1ª Pessoa 3D):</strong>
+              <p class="text-[11px] text-zinc-300 mt-0.5">
+                O jogador experimenta o labirinto através dos olhos do Caçador. A escuridão é quase total; o único foco de luz é o facho volumétrico da lanterna cortando a poeira e névoa dos corredores de pedra gótica.
+              </p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
+            <div class="p-2 rounded bg-zinc-900 border border-zinc-800">
+              <span class="text-amber-400 font-bold">🏮 Luz Realista:</span>
+              <p class="text-zinc-400">Sombras dinâmicas se projetam nas esquinas conforme o jogador vira a lanterna.</p>
+            </div>
+            <div class="p-2 rounded bg-zinc-900 border border-zinc-800">
+              <span class="text-cyan-400 font-bold">🎧 Áudio 3D Binaural:</span>
+              <p class="text-zinc-400">Passos ecoando no chão molhado e sussurros espectrais que indicam a aproximação.</p>
+            </div>
+            <div class="p-2 rounded bg-zinc-900 border border-zinc-800">
+              <span class="text-purple-400 font-bold">👻 Aparição Súbita:</span>
+              <p class="text-zinc-400">O Fantasma surge flutuando no breu, exigindo reação rápida com a trava ⛓️!</p>
+            </div>
+          </div>
+        `;
+      } else {
+        tabG.className = 'flex-1 py-2 px-3 rounded-xl bg-purple-500/20 border border-purple-400 text-purple-300 font-bold text-xs flex items-center justify-center gap-2 transition';
+        tabH.className = 'flex-1 py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 font-bold text-xs flex items-center justify-center gap-2 transition hover:text-white';
+        badgeEl.textContent = '👻 Visão do Fantasma em 3D Isométrica • Perspectiva Espectral com Raio-X de Tetos e Paredes';
+        descEl.innerHTML = `
+          <div class="flex items-start gap-2">
+            <span class="text-purple-400 text-base">🔮</span>
+            <div>
+              <strong class="text-purple-300">Perspectiva Aérea / Isométrica 3D Espectral:</strong>
+              <p class="text-[11px] text-zinc-300 mt-0.5">
+                O Fantasma flutua pelo teto e paredes com perspectiva isométrica 3D em corte (estilo <em>Luigi's Mansion</em> paranormal). Paredes e tetos tornam-se translúcidos em tons de roxo e ciano conforme o Fantasma se aproxima.
+              </p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
+            <div class="p-2 rounded bg-zinc-900 border border-zinc-800">
+              <span class="text-purple-400 font-bold">🌐 Visão Raio-X:</span>
+              <p class="text-zinc-400">O Fantasma enxerga as auras vitais e os cones de luz amarela dos Caçadores através das paredes.</p>
+            </div>
+            <div class="p-2 rounded bg-zinc-900 border border-zinc-800">
+              <span class="text-emerald-400 font-bold">⚡ Emboscada Tridimensional:</span>
+              <p class="text-zinc-400">Capacidade de planar por cima de móveis, teleportar por frestas e apagar luzes à distância.</p>
+            </div>
+            <div class="p-2 rounded bg-zinc-900 border border-zinc-800">
+              <span class="text-sky-400 font-bold">✨ Ectoplasma Flutuante:</span>
+              <p class="text-zinc-400">Rastro de partículas brilhantes ao atravessar paredes de pedra antigas.</p>
+            </div>
+          </div>
+        `;
+      }
+
+      startConceptAnimation();
+    };
+
+    function startConceptAnimation() {
+      if (conceptAnimId) cancelAnimationFrame(conceptAnimId);
+      const canvas = document.getElementById('concept-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      function draw() {
+        const w = canvas.width, h = canvas.height;
+        const time = performance.now() * 0.002;
+
+        ctx.clearRect(0, 0, w, h);
+
+        if (conceptCurrentTab === 'hunter') {
+          // ==================================================================
+          // RENDER CONCEITUAL: CORREDOR 3D EM 1ª PESSOA COM LANTERNA
+          // ==================================================================
+          const vpX = w / 2 + Math.sin(time * 0.6) * 18;
+          const vpY = h / 2 - 10 + Math.cos(time * 0.8) * 8;
+
+          // Paredes, teto e chão em perspectiva de fuga
+          const bgGrad = ctx.createRadialGradient(vpX, vpY, 20, vpX, vpY, 340);
+          bgGrad.addColorStop(0, '#0a0a14');
+          bgGrad.addColorStop(1, '#020205');
+          ctx.fillStyle = bgGrad;
+          ctx.fillRect(0, 0, w, h);
+
+          // Ladrilhos do chão em perspectiva 3D
+          ctx.strokeStyle = 'rgba(75, 85, 99, 0.28)';
+          ctx.lineWidth = 1.5;
+          for (let i = -6; i <= 6; i++) {
+            const bx = w / 2 + i * 75;
+            ctx.beginPath();
+            ctx.moveTo(vpX, vpY + 20);
+            ctx.lineTo(bx, h);
+            ctx.stroke();
+          }
+          for (let z = 1; z <= 7; z++) {
+            const zy = vpY + 20 + Math.pow(z / 7, 2) * (h - vpY - 20);
+            ctx.beginPath();
+            ctx.moveTo(0, zy);
+            ctx.lineTo(w, zy);
+            ctx.stroke();
+          }
+
+          // Paredes laterais de pedra com perspectiva
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.22)';
+          ctx.beginPath();
+          ctx.moveTo(0, 0); ctx.lineTo(vpX - 90, vpY - 45); ctx.lineTo(vpX - 90, vpY + 45); ctx.lineTo(0, h);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(w, 0); ctx.lineTo(vpX + 90, vpY - 45); ctx.lineTo(vpX + 90, vpY + 45); ctx.lineTo(w, h);
+          ctx.stroke();
+
+          // Facho Volumétrico da Lanterna do Caçador
+          const flashX = w / 2 + Math.sin(time) * 45;
+          const flashY = h / 2 + 10 + Math.cos(time * 1.2) * 20;
+          const fGrad = ctx.createRadialGradient(flashX, flashY, 15, flashX, flashY, 240);
+          fGrad.addColorStop(0, 'rgba(254, 240, 138, 0.7)');
+          fGrad.addColorStop(0.35, 'rgba(251, 191, 36, 0.28)');
+          fGrad.addColorStop(0.75, 'rgba(251, 191, 36, 0.08)');
+          fGrad.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = fGrad;
+          ctx.beginPath();
+          ctx.arc(flashX, flashY, 240, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Partículas de poeira iluminadas pela lanterna
+          ctx.fillStyle = 'rgba(255, 255, 200, 0.55)';
+          for (let p = 0; p < 18; p++) {
+            const px = (flashX - 80) + ((p * 47 + time * 30) % 170);
+            const py = (flashY - 70) + ((p * 31 + Math.sin(time + p) * 25) % 140);
+            ctx.beginPath(); ctx.arc(px, py, (p % 3) + 1, 0, Math.PI * 2); ctx.fill();
+          }
+
+          // Fantasma Espectral no Fundo do Corredor
+          const gX = vpX + Math.sin(time * 1.8) * 25;
+          const gY = vpY - 5 + Math.cos(time * 2.2) * 12;
+          const gAura = ctx.createRadialGradient(gX, gY, 4, gX, gY, 55);
+          gAura.addColorStop(0, 'rgba(192, 132, 252, 0.9)');
+          gAura.addColorStop(0.5, 'rgba(168, 85, 247, 0.4)');
+          gAura.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = gAura;
+          ctx.beginPath(); ctx.arc(gX, gY, 55, 0, Math.PI * 2); ctx.fill();
+
+          // Corpo espectral translúcido
+          ctx.fillStyle = 'rgba(233, 213, 255, 0.85)';
+          ctx.beginPath();
+          ctx.arc(gX, gY - 6, 16, 0, Math.PI * 2);
+          ctx.fill();
+          // Olhos roxos brilhantes
+          ctx.fillStyle = '#6b21a8';
+          ctx.beginPath();
+          ctx.arc(gX - 5, gY - 7, 3, 0, Math.PI * 2);
+          ctx.arc(gX + 5, gY - 7, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#f472b6';
+          ctx.beginPath();
+          ctx.arc(gX - 5, gY - 7, 1.5, 0, Math.PI * 2);
+          ctx.arc(gX + 5, gY - 7, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // HUD diegético do Caçador em 1ª Pessoa
+          ctx.save();
+          ctx.font = 'bold 11px monospace';
+          ctx.fillStyle = '#34d399';
+          ctx.fillText('🔋 BATERIA: 84% [TURBO PRONTO]', 24, h - 22);
+          ctx.fillStyle = '#22d3ee';
+          ctx.fillText('⛓️ TRAVA FANTASMA: [E] PRONTO (3s)', w - 245, h - 22);
+          ctx.restore();
+
+        } else {
+          // ==================================================================
+          // RENDER CONCEITUAL: MANSÃO ISOMÉTRICA 3D (VISÃO DO FANTASMA)
+          // ==================================================================
+          ctx.fillStyle = '#06060f';
+          ctx.fillRect(0, 0, w, h);
+
+          const cx = w / 2;
+          const cy = h / 2 - 20;
+
+          // Grid Isométrico de Cômodos em Corte 3D
+          function iso(x, y, z) {
+            return {
+              x: cx + (x - y) * 36,
+              y: cy + (x + y) * 18 - z * 24
+            };
+          }
+
+          // Desenho dos blocos e paredes translúcidas
+          for (let ix = -3; ix <= 3; ix++) {
+            for (let iy = -2; iy <= 2; iy++) {
+              const p0 = iso(ix, iy, 0);
+              const p1 = iso(ix + 1, iy, 0);
+              const p2 = iso(ix + 1, iy + 1, 0);
+              const p3 = iso(ix, iy + 1, 0);
+
+              ctx.strokeStyle = 'rgba(168, 85, 247, 0.2)';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y);
+              ctx.closePath();
+              ctx.stroke();
+
+              // Paredes verticais espectrais semitransparentes
+              if ((ix === -1 && iy === 0) || (ix === 1 && iy === -1) || (ix === 0 && iy === 1)) {
+                const top0 = iso(ix, iy, 1.8);
+                const top1 = iso(ix + 1, iy, 1.8);
+                ctx.fillStyle = 'rgba(59, 7, 100, 0.35)';
+                ctx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
+                ctx.beginPath();
+                ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(top1.x, top1.y); ctx.lineTo(top0.x, top0.y);
+                ctx.closePath();
+                ctx.fill(); ctx.stroke();
+              }
+            }
+          }
+
+          // Caçador 1 com facho volumétrico no piso inferior
+          const hPos1 = iso(-1.2, 0.8, 0);
+          ctx.fillStyle = '#fbbf24';
+          ctx.beginPath(); ctx.arc(hPos1.x, hPos1.y, 8, 0, Math.PI * 2); ctx.fill();
+          // Cone de Lanterna no chão isométrico
+          const coneGrad = ctx.createRadialGradient(hPos1.x, hPos1.y, 4, hPos1.x + 50, hPos1.y - 15, 80);
+          coneGrad.addColorStop(0, 'rgba(254, 240, 138, 0.6)');
+          coneGrad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+          ctx.fillStyle = coneGrad;
+          ctx.beginPath();
+          ctx.moveTo(hPos1.x, hPos1.y);
+          ctx.arc(hPos1.x, hPos1.y, 80, -0.6, 0.3);
+          ctx.closePath();
+          ctx.fill();
+
+          // Caçador 2 em outro cômodo
+          const hPos2 = iso(1.5, -0.5, 0);
+          ctx.fillStyle = '#38bdf8';
+          ctx.beginPath(); ctx.arc(hPos2.x, hPos2.y, 8, 0, Math.PI * 2); ctx.fill();
+
+          // O Fantasma em 3D Flutuando Acima das Paredes com Aura Roxa
+          const ghostZ = 2.2 + Math.sin(time * 2) * 0.3;
+          const gPos = iso(0.2, 0.1, ghostZ);
+
+          const aura = ctx.createRadialGradient(gPos.x, gPos.y, 6, gPos.x, gPos.y, 48);
+          aura.addColorStop(0, 'rgba(192, 132, 252, 0.9)');
+          aura.addColorStop(0.6, 'rgba(147, 51, 234, 0.45)');
+          aura.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = aura;
+          ctx.beginPath(); ctx.arc(gPos.x, gPos.y, 48, 0, Math.PI * 2); ctx.fill();
+
+          // Corpo do Fantasma
+          ctx.fillStyle = '#f5d0fe';
+          ctx.beginPath(); ctx.arc(gPos.x, gPos.y, 14, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+          // Olhos
+          ctx.fillStyle = '#7e22ce';
+          ctx.beginPath();
+          ctx.arc(gPos.x - 4, gPos.y - 2, 2.5, 0, Math.PI * 2);
+          ctx.arc(gPos.x + 4, gPos.y - 2, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Feixe de Visão Raio-X conectando o Fantasma aos Caçadores
+          ctx.strokeStyle = 'rgba(232, 121, 249, 0.35)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath(); ctx.moveTo(gPos.x, gPos.y); ctx.lineTo(hPos1.x, hPos1.y); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(gPos.x, gPos.y); ctx.lineTo(hPos2.x, hPos2.y); ctx.stroke();
+          ctx.setLineDash([]);
+
+          // HUD Espectral do Fantasma
+          ctx.save();
+          ctx.font = 'bold 11px monospace';
+          ctx.fillStyle = '#c084fc';
+          ctx.fillText('👻 MODO ESPECTRAL 3D • [1] FORMA ASTRAL  [2] APAGÃO  [3] CLONE  [4] SALTO', 24, h - 22);
+          ctx.restore();
+        }
+
+        conceptAnimId = requestAnimationFrame(draw);
+      }
+
+      draw();
     }
 
     function escapeHtml(str) {
