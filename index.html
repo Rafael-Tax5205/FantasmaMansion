@@ -1387,8 +1387,23 @@
     function moveHostPlayer(p, vx, vy, ignoreInner) {
       const r = 16;
       const isGhost = p.role === 'ghost';
-      if (!isCollidingWithWall(p.x + vx, p.y, r, ignoreInner, isGhost)) p.x = Math.max(28, Math.min(MAP_W - 28, p.x + vx));
-      if (!isCollidingWithWall(p.x, p.y + vy, r, ignoreInner, isGhost)) p.y = Math.max(28, Math.min(MAP_H - 28, p.y + vy));
+      const dist = Math.hypot(vx, vy);
+      if (dist < 0.001) return;
+      // Sub-stepping anti-tunneling (máx 4px por passo) para NUNCA atravessar paredes
+      const steps = Math.max(1, Math.ceil(dist / 4));
+      const svx = vx / steps;
+      const svy = vy / steps;
+      for (let s = 0; s < steps; s++) {
+        const nx = Math.max(28, Math.min(MAP_W - 28, p.x + svx));
+        const ny = Math.max(28, Math.min(MAP_H - 28, p.y + svy));
+        if (!isCollidingWithWall(nx, ny, r, ignoreInner, isGhost)) {
+          p.x = nx;
+          p.y = ny;
+        } else {
+          if (!isCollidingWithWall(nx, p.y, r, ignoreInner, isGhost)) p.x = nx;
+          if (!isCollidingWithWall(p.x, ny, r, ignoreInner, isGhost)) p.y = ny;
+        }
+      }
     }
 
     // ========================================================================
@@ -1542,48 +1557,46 @@
       const sightObstacles = [...hostEngine.walls, ...closedDoors];
 
       // ======================================================================
-      // IA AVANÇADA DOS BOTS (DESVIO DE PAREDES, ABERTURA DE PORTAS E ANTI-TRAVAMENTO)
+      // IA AVANÇADA DOS BOTS (CONSCIÊNCIA DE SALAS, ABERTURA DE PORTAS E MIRA SUAVE)
       // ======================================================================
       const botHunters = pList.filter(h => h.role === 'hunter' && h.isBot && !h.frozen);
       const availRelics = hostEngine.relics.filter(r => !r.collected);
       const incompleteGens = (hostEngine.generators || []).filter(g => !g.completed);
 
+      // Identifica a porta do cômodo correspondente às coordenadas
+      function getRoomDoorForCoord(px, py) {
+        if (!hostEngine.doors || hostEngine.doors.length < 4) return null;
+        if (px < 440 && py < 280) return hostEngine.doors[0]; // Noroeste
+        if (px > 1140 && py < 280) return hostEngine.doors[1]; // Nordeste
+        if (px < 440 && py > 540) return hostEngine.doors[2]; // Sudoeste
+        if (px > 1140 && py > 540) return hostEngine.doors[3]; // Sudeste
+        return null;
+      }
+
       function getNavDirection(bot, targetX, targetY, isGhost, isAstral) {
         const rawDist = Math.hypot(targetX - bot.x, targetY - bot.y);
         if (rawDist < 10) return { dx: 0, dy: 0, angle: bot.angle };
 
-        // Se for Caçador e houver uma porta fechada entre o bot e o alvo:
+        // Se for Caçador e o alvo estiver dentro de uma sala fechada:
         if (!isGhost && !isAstral) {
-          for (const d of closedDoors) {
-            const dMidX = d.x + d.w / 2;
-            const dMidY = d.y + d.h / 2;
+          const targetDoor = getRoomDoorForCoord(targetX, targetY);
+          const botDoor = getRoomDoorForCoord(bot.x, bot.y);
+          if (targetDoor && !targetDoor.isOpen && botDoor !== targetDoor) {
+            // O alvo está trancado dentro do quarto: vai direto para a porta do quarto!
+            const dMidX = targetDoor.x + targetDoor.w / 2;
+            const dMidY = targetDoor.y + targetDoor.h / 2;
             const distToDoor = Math.hypot(dMidX - bot.x, dMidY - bot.y);
-            // Se a porta estiver no caminho e o alvo estiver mais distante que a porta:
-            if (distToDoor < 140 && Math.hypot(targetX - dMidX, targetY - dMidY) < rawDist) {
-              if (distToDoor < 36) {
-                // Chegou na porta fechada: mantém-se firme na porta para abri-la!
-                return { dx: 0, dy: 0, angle: Math.atan2(dMidY - bot.y, dMidX - bot.x) };
-              }
-              // Navega até o centro da porta para poder abri-la
-              targetX = dMidX;
-              targetY = dMidY;
-              break;
+            if (distToDoor < 36) {
+              // Chegou colado na porta: aguarda abrir
+              return { dx: 0, dy: 0, angle: Math.atan2(dMidY - bot.y, dMidX - bot.x) };
             }
+            targetX = dMidX;
+            targetY = dMidY;
           }
         }
 
         const baseAngle = Math.atan2(targetY - bot.y, targetX - bot.x);
-
-        // Se estiver em modo de recuperação anti-travamento:
-        if (bot.panicTimer > 0) {
-          bot.panicTimer -= dt;
-          const pAngle = bot.panicAngle || (baseAngle + Math.PI / 2);
-          return { dx: Math.cos(pAngle), dy: Math.sin(pAngle), angle: pAngle };
-        }
-
-        // Teste de desvio angular com persistência direcional (evita que o bot fique oscilando loucamente entre esquerda e direita)
-        bot.steerSide = bot.steerSide || (Math.random() < 0.5 ? 1 : -1);
-        const stepDist = 26;
+        const stepDist = 24;
 
         // Se o caminho direto está livre, avança direto
         const directX = bot.x + Math.cos(baseAngle) * stepDist;
@@ -1592,11 +1605,12 @@
           return { dx: Math.cos(baseAngle), dy: Math.sin(baseAngle), angle: baseAngle };
         }
 
-        // Se encontrou obstáculo/parede pela frente, contorna suavemente mantendo o lado escolhido (steerSide)
+        // Se encontrou obstáculo/quina, contorna suavemente mantendo o lado persistente
+        bot.steerSide = bot.steerSide || (Math.random() < 0.5 ? 1 : -1);
         const side = bot.steerSide;
         const testOffsets = [
-          side * 0.45, side * 0.85, side * 1.30, side * 1.75, side * 2.20,
-          -side * 0.45, -side * 0.85, -side * 1.30, -side * 1.75, -side * 2.20,
+          side * 0.45, side * 0.90, side * 1.35, side * 1.80,
+          -side * 0.45, -side * 0.90, -side * 1.35, -side * 1.80,
           Math.PI
         ];
 
@@ -1623,9 +1637,9 @@
         bp.stuckTimer = bp.stuckTimer || 0;
         bp.checkClock = (bp.checkClock || 0) + dt;
 
-        if (bp.checkClock >= 0.75) {
+        if (bp.checkClock >= 0.8) {
           const moved = Math.hypot(bp.x - bp.lastCheckX, bp.y - bp.lastCheckY);
-          if (moved < 12) {
+          if (moved < 10) {
             bp.stuckTimer += bp.checkClock;
           } else {
             bp.stuckTimer = 0;
@@ -1635,13 +1649,12 @@
           bp.checkClock = 0;
         }
 
-        if (bp.stuckTimer >= 1.2) {
+        if (bp.stuckTimer >= 1.5) {
           bp.stuckTimer = 0;
-          bp.panicTimer = 1.3;
-          bp.panicAngle = Math.random() * Math.PI * 2;
           bp.targetOffset = ((bp.targetOffset || 0) + 1) % 5;
+          bp.steerSide = -(bp.steerSide || 1);
           if (bp.role === 'ghost' && bp.phaseCooldown <= 0) {
-            bp.ghostSkill1 = true; // Fantasma usa Forma Astral para escapar imediatamente de quinas
+            bp.ghostSkill1 = true;
           }
         }
 
@@ -1664,7 +1677,7 @@
             bp.dx = nav.dx;
             bp.dy = nav.dy;
             const turnDiff = Math.atan2(Math.sin(nav.angle - bp.angle), Math.cos(nav.angle - bp.angle));
-            bp.angle += Math.max(-7.0 * dt, Math.min(7.0 * dt, turnDiff));
+            bp.angle += Math.max(-5.5 * dt, Math.min(5.5 * dt, turnDiff));
           }
         } else {
           // Caçador Bot
@@ -1674,15 +1687,12 @@
           let tx = 800, ty = 420;
 
           if (frozenAlly) {
-            // Prioridade número 1: salvar companheiro de equipe congelado
             tx = frozenAlly.x;
             ty = frozenAlly.y;
           } else {
-            // Multi-Targeting: distribui objetivos para que os bots não fiquem todos no mesmo ponto
             const botSubIndex = botHunters.findIndex(b => b.id === bp.id);
             const offset = (botSubIndex >= 0 ? botSubIndex : 0) + (bp.targetOffset || 0);
 
-            // Se houver geradores incompletos e este bot for encarregado de gerador ou estiver perto de um:
             const nearbyGen = incompleteGens.find(g => Math.hypot(g.x - bp.x, g.y - bp.y) < 280);
             if (nearbyGen) {
               tx = nearbyGen.x;
@@ -1692,7 +1702,6 @@
               tx = chosenGen.x;
               ty = chosenGen.y;
             } else if (availRelics.length > 0) {
-              // Ordena tesouros por distância ao bot e pega um tesouro exclusivo baseado no offset
               const sortedRelics = [...availRelics].sort((a, b) => Math.hypot(a.x - bp.x, a.y - bp.y) - Math.hypot(b.x - bp.x, b.y - bp.y));
               const chosenRelic = sortedRelics[offset % sortedRelics.length] || sortedRelics[0];
               tx = chosenRelic.x;
@@ -1704,8 +1713,8 @@
           bp.dx = nav.dx;
           bp.dy = nav.dy;
 
-          let desiredAim = nav.angle;
-          if (ghost && Math.hypot(ghost.x - bp.x, ghost.y - bp.y) < 260) {
+          let desiredAim = Math.hypot(bp.dx, bp.dy) > 0.05 ? Math.atan2(bp.dy, bp.dx) : bp.angle;
+          if (ghost && Math.hypot(ghost.x - bp.x, ghost.y - bp.y) < 250) {
             const gDist = Math.hypot(ghost.x - bp.x, ghost.y - bp.y);
             const hasLos = hasLineOfSight(bp.x, bp.y, ghost.x, ghost.y, sightObstacles);
             if (hasLos) {
@@ -1721,9 +1730,9 @@
             bp.turboReq = false;
           }
 
-          // Rotação suave da lanterna (damping angular que elimina 100% de tremores e oscilações doidas)
+          // Rotação suave da lanterna (damping angular estável e sem balanço frenético)
           const turnDiff = Math.atan2(Math.sin(desiredAim - bp.angle), Math.cos(desiredAim - bp.angle));
-          const maxTurn = 6.2 * dt;
+          const maxTurn = 4.2 * dt;
           bp.angle += Math.max(-maxTurn, Math.min(maxTurn, turnDiff));
         }
       }
@@ -2388,10 +2397,12 @@
         ctx.restore();
       });
 
-      // Fachos de Luz das Lanternas (Raycasting em leque: bloqueio físico real por qualquer pilar, obstáculo ou parede!)
+      // Fachos de Luz das Lanternas com Projeção Real de Sombras (Shadow Casting 2D)
+      // NENHUMA LUZ ATRAVESSA PAREDES, PILARES OU OBSTÁCULOS!
       const blackoutActive = (gameState.blackoutTimer || 0) > 0;
       const closedDoors = (gameState.doors || []).filter(d => !d.isOpen);
       const sightObstacles = [...(gameState.walls || []), ...closedDoors];
+      const floorShadowColor = isGhostView ? (stage.floorGhost || '#110a22') : (stage.floorHunter || '#18181f');
 
       gameState.players.forEach(p => {
         if (p.role !== 'hunter' || p.frozen || (p.battery || 0) <= 0) return;
@@ -2401,24 +2412,68 @@
         const spread = p.turbo ? 0.56 : 0.43;
 
         ctx.save();
+        // 1. Desenha o cone de luz suave
         const grad = ctx.createRadialGradient(rp.x, rp.y, 10, rp.x, rp.y, range);
         grad.addColorStop(0, p.turbo ? 'rgba(254, 240, 138, 0.72)' : 'rgba(253, 224, 71, 0.48)');
         grad.addColorStop(0.65, p.turbo ? 'rgba(251, 191, 36, 0.32)' : 'rgba(251, 191, 36, 0.16)');
         grad.addColorStop(1, 'rgba(251, 191, 36, 0)');
         ctx.fillStyle = grad;
-
         ctx.beginPath();
         ctx.moveTo(rp.x, rp.y);
-        const raySteps = 28;
-        for (let i = 0; i <= raySteps; i++) {
-          const rayAngle = (aimAngle - spread) + (spread * 2) * (i / raySteps);
-          const rdx = Math.cos(rayAngle);
-          const rdy = Math.sin(rayAngle);
-          const hitDist = rayCastToWalls(rp.x, rp.y, rdx, rdy, range, sightObstacles);
-          ctx.lineTo(rp.x + rdx * hitDist, rp.y + rdy * hitDist);
-        }
+        ctx.arc(rp.x, rp.y, range, aimAngle - spread, aimAngle + spread);
         ctx.closePath();
         ctx.fill();
+
+        // 2. Projeta sombras escuras perfeitas atrás de cada obstáculo/pilar atingido pela luz
+        ctx.fillStyle = floorShadowColor;
+        const maxProj = range * 1.6;
+
+        for (let i = 0; i < sightObstacles.length; i++) {
+          const w = sightObstacles[i];
+          const midX = w.x + w.w / 2;
+          const midY = w.y + w.h / 2;
+          const distToObstacle = Math.hypot(midX - rp.x, midY - rp.y);
+          if (distToObstacle > range + Math.max(w.w, w.h)) continue;
+
+          // Os 4 vértices do obstáculo retangular
+          const v = [
+            { x: w.x, y: w.y },
+            { x: w.x + w.w, y: w.y },
+            { x: w.x + w.w, y: w.y + w.h },
+            { x: w.x, y: w.y + w.h }
+          ];
+
+          // 4 arestas e suas normais externas
+          const edges = [
+            { a: v[0], b: v[1], nx: 0, ny: -1 },
+            { a: v[1], b: v[2], nx: 1, ny: 0 },
+            { a: v[2], b: v[3], nx: 0, ny: 1 },
+            { a: v[3], b: v[0], nx: -1, ny: 0 }
+          ];
+
+          for (let e = 0; e < 4; e++) {
+            const edge = edges[e];
+            const emx = (edge.a.x + edge.b.x) / 2;
+            const emy = (edge.a.y + edge.b.y) / 2;
+            // Se a aresta estiver voltada de frente para a luz:
+            if (edge.nx * (rp.x - emx) + edge.ny * (rp.y - emy) > 0) {
+              const da = Math.hypot(edge.a.x - rp.x, edge.a.y - rp.y) || 1;
+              const db = Math.hypot(edge.b.x - rp.x, edge.b.y - rp.y) || 1;
+              const aProjX = edge.a.x + ((edge.a.x - rp.x) / da) * maxProj;
+              const aProjY = edge.a.y + ((edge.a.y - rp.y) / da) * maxProj;
+              const bProjX = edge.b.x + ((edge.b.x - rp.x) / db) * maxProj;
+              const bProjY = edge.b.y + ((edge.b.y - rp.y) / db) * maxProj;
+
+              ctx.beginPath();
+              ctx.moveTo(edge.a.x, edge.a.y);
+              ctx.lineTo(edge.b.x, edge.b.y);
+              ctx.lineTo(bProjX, bProjY);
+              ctx.lineTo(aProjX, aProjY);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+        }
         ctx.restore();
       });
 
