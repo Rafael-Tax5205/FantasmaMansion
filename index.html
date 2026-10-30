@@ -514,6 +514,12 @@
         generators: [
           { id: 1, x: 260, y: 190, name: 'Gerador da Biblioteca' },
           { id: 2, x: 1340, y: 640, name: 'Gerador da Cripta' }
+        ],
+        doors: [
+          { id: 'd1_1', x: 280, y: 280, w: 80, h: 20, name: 'Porta da Biblioteca' },
+          { id: 'd1_2', x: 1240, y: 280, w: 80, h: 20, name: 'Porta do Laboratório' },
+          { id: 'd1_3', x: 280, y: 540, w: 80, h: 20, name: 'Porta da Adega' },
+          { id: 'd1_4', x: 1240, y: 540, w: 80, h: 20, name: 'Porta da Cripta' }
         ]
       },
       {
@@ -573,6 +579,12 @@
         generators: [
           { id: 1, x: 230, y: 160, name: 'Gerador da UTI' },
           { id: 2, x: 1370, y: 680, name: 'Gerador do Necrotério' }
+        ],
+        doors: [
+          { id: 'd2_1', x: 470, y: 240, w: 110, h: 20, name: 'Porta da Triagem' },
+          { id: 'd2_2', x: 1020, y: 240, w: 110, h: 20, name: 'Porta Cirúrgica' },
+          { id: 'd2_3', x: 470, y: 600, w: 110, h: 20, name: 'Porta da Farmácia' },
+          { id: 'd2_4', x: 1020, y: 600, w: 110, h: 20, name: 'Porta do Necrotério' }
         ]
       },
       {
@@ -624,6 +636,12 @@
         generators: [
           { id: 1, x: 200, y: 150, name: 'Gerador da Capela' },
           { id: 2, x: 1400, y: 700, name: 'Gerador do Túmulo' }
+        ],
+        doors: [
+          { id: 'd3_1', x: 560, y: 205, w: 80, h: 22, name: 'Portão da Capela' },
+          { id: 'd3_2', x: 960, y: 205, w: 58, h: 22, name: 'Portão do Mausoléu' },
+          { id: 'd3_3', x: 560, y: 635, w: 80, h: 22, name: 'Portão do Covil' },
+          { id: 'd3_4', x: 960, y: 635, w: 58, h: 22, name: 'Portão do Túmulo' }
         ]
       }
     ];
@@ -1252,6 +1270,19 @@
       }));
       hostEngine.generatorsActive = 0;
 
+      // Inicializa as Portas dos Cômodos (Fantasma atravessa livre, Caçadores abrem em ~400ms)
+      hostEngine.doors = (stage.doors || []).map(d => ({
+        id: d.id,
+        name: d.name,
+        x: d.x,
+        y: d.y,
+        w: d.w,
+        h: d.h,
+        isOpen: false,
+        openTimer: 0,
+        interactProgress: 0
+      }));
+
       hostEngine.clones = [];
       hostEngine.timeLeft = 180;
       hostEngine.blackoutTimer = 0;
@@ -1262,9 +1293,9 @@
     }
 
     // ========================================================================
-    // SISTEMA ANTI-TRAVAMENTO EM PAREDES (UNSTICK & SAFE COLLISION)
+    // SISTEMA ANTI-TRAVAMENTO EM PAREDES E PORTAS (UNSTICK & SAFE COLLISION)
     // ========================================================================
-    function isCollidingWithWall(cx, cy, r = 16, ignoreInner = false) {
+    function isCollidingWithWall(cx, cy, r = 16, ignoreInner = false, ignoreDoors = false) {
       if (cx - r < 20 || cx + r > MAP_W - 20 || cy - r < 20 || cy + r > MAP_H - 20) return true;
       const walls = hostEngine.walls || [];
       for (let i = 0; i < walls.length; i++) {
@@ -1274,11 +1305,22 @@
         const ky = Math.max(w.y, Math.min(cy, w.y + w.h));
         if (Math.hypot(cx - kx, cy - ky) < r) return true;
       }
+      // Portas Fechadas bloqueiam Caçadores, mas o Fantasma atravessa livremente!
+      if (!ignoreDoors && hostEngine.doors) {
+        for (let i = 0; i < hostEngine.doors.length; i++) {
+          const d = hostEngine.doors[i];
+          if (!d.isOpen) {
+            const kx = Math.max(d.x, Math.min(cx, d.x + d.w));
+            const ky = Math.max(d.y, Math.min(cy, d.y + d.h));
+            if (Math.hypot(cx - kx, cy - ky) < r) return true;
+          }
+        }
+      }
       return false;
     }
 
-    function unstickPlayer(p, r = 16) {
-      if (!isCollidingWithWall(p.x, p.y, r, false)) return;
+    function unstickPlayer(p, r = 16, ignoreDoors = false) {
+      if (!isCollidingWithWall(p.x, p.y, r, false, ignoreDoors)) return;
       const angles = [0, Math.PI/4, Math.PI/2, 3*Math.PI/4, Math.PI, -3*Math.PI/4, -Math.PI/2, -Math.PI/4,
                       Math.PI/8, 3*Math.PI/8, 5*Math.PI/8, 7*Math.PI/8, -Math.PI/8, -3*Math.PI/8, -5*Math.PI/8, -7*Math.PI/8];
       for (let dist = 6; dist <= 160; dist += 6) {
@@ -1286,7 +1328,7 @@
           const a = angles[i];
           const testX = Math.max(28, Math.min(MAP_W - 28, p.x + Math.cos(a) * dist));
           const testY = Math.max(28, Math.min(MAP_H - 28, p.y + Math.sin(a) * dist));
-          if (!isCollidingWithWall(testX, testY, r, false)) {
+          if (!isCollidingWithWall(testX, testY, r, false, ignoreDoors)) {
             p.x = testX;
             p.y = testY;
             return;
@@ -1306,9 +1348,10 @@
 
     function moveHostPlayer(p, vx, vy, ignoreInner) {
       const r = 16;
-      if (!isCollidingWithWall(p.x + vx, p.y, r, ignoreInner)) p.x = Math.max(28, Math.min(MAP_W - 28, p.x + vx));
-      if (!isCollidingWithWall(p.x, p.y + vy, r, ignoreInner)) p.y = Math.max(28, Math.min(MAP_H - 28, p.y + vy));
-      if (!ignoreInner) unstickPlayer(p, r);
+      const isGhost = p.role === 'ghost';
+      if (!isCollidingWithWall(p.x + vx, p.y, r, ignoreInner, isGhost)) p.x = Math.max(28, Math.min(MAP_W - 28, p.x + vx));
+      if (!isCollidingWithWall(p.x, p.y + vy, r, ignoreInner, isGhost)) p.y = Math.max(28, Math.min(MAP_H - 28, p.y + vy));
+      if (!ignoreInner) unstickPlayer(p, r, isGhost);
     }
 
     // ========================================================================
@@ -1445,6 +1488,35 @@
         cl.y = Math.max(32, Math.min(MAP_H - 32, cl.y));
       }
 
+      // Mecânica das Portas (Caçadores abrem em ~400ms, Fantasma atravessa livre)
+      hostEngine.doors = hostEngine.doors || [];
+      for (const door of hostEngine.doors) {
+        if (door.isOpen) {
+          door.openTimer -= dt;
+          if (door.openTimer <= 0) {
+            door.isOpen = false;
+            door.interactProgress = 0;
+          }
+        } else {
+          const doorMidX = door.x + door.w / 2;
+          const doorMidY = door.y + door.h / 2;
+          const hunterNearDoor = pList.some(h => h.role === 'hunter' && !h.frozen && Math.hypot(h.x - doorMidX, h.y - doorMidY) < 48);
+          if (hunterNearDoor) {
+            door.interactProgress = Math.min(100, (door.interactProgress || 0) + 250 * dt);
+            if (door.interactProgress >= 100) {
+              door.isOpen = true;
+              door.openTimer = 4.0;
+            }
+          } else {
+            door.interactProgress = Math.max(0, (door.interactProgress || 0) - 160 * dt);
+          }
+        }
+      }
+
+      // Lista de obstáculos atuais (paredes + portas fechadas) para visão e lanternas
+      const closedDoors = hostEngine.doors.filter(d => !d.isOpen);
+      const sightObstacles = [...hostEngine.walls, ...closedDoors];
+
       // IA dos Bots
       for (const bp of pList) {
         if (!bp.isBot) continue;
@@ -1473,11 +1545,17 @@
           bp.dy = (ty - bp.y) / dist;
           if (ghost && Math.hypot(ghost.x - bp.x, ghost.y - bp.y) < 250) {
             const gDist = Math.hypot(ghost.x - bp.x, ghost.y - bp.y);
-            bp.angle = Math.atan2(ghost.y - bp.y, ghost.x - bp.x);
-            bp.turboReq = gDist < 175 && bp.battery > 30;
-            // Bot Caçador usa sua trava de 3s se o Fantasma chegar muito perto
-            if (gDist < 130 && (bp.stunCharges || 0) > 0 && (ghost.stunTimer || 0) <= 0 && hostEngine.botStunCooldown <= 0) {
-              bp.hunterStun = true;
+            const hasLos = hasLineOfSight(bp.x, bp.y, ghost.x, ghost.y, sightObstacles);
+            // O Bot Caçador SÓ sabe onde o Fantasma está se NÃO houver parede nem porta fechada no caminho!
+            if (hasLos) {
+              bp.angle = Math.atan2(ghost.y - bp.y, ghost.x - bp.x);
+              bp.turboReq = gDist < 175 && bp.battery > 30;
+              // Bot Caçador só usa sua trava de 3s se estiver vendo o Fantasma com linha de visão limpa!
+              if (gDist < 140 && (bp.stunCharges || 0) > 0 && (ghost.stunTimer || 0) <= 0 && hostEngine.botStunCooldown <= 0) {
+                bp.hunterStun = true;
+              }
+            } else {
+              bp.turboReq = false;
             }
           } else {
             bp.angle = Math.atan2(bp.dy, bp.dx);
@@ -1486,22 +1564,26 @@
         }
       }
 
-      // Poder de Travar o Fantasma por 3 Segundos (1 uso por cada Caçador)
+      // Poder de Travar o Fantasma por 3 Segundos (SÓ FUNCIONA COM LINHA DE VISÃO, NUNCA ATRAVÉS DA PAREDE!)
       for (const h of pList.filter(x => x.role === 'hunter')) {
         if (h.hunterStun) {
           h.hunterStun = false;
           if (!h.frozen && (h.stunCharges || 0) > 0 && ghost && (ghost.stunTimer || 0) <= 0) {
-            h.stunCharges = 0;
-            ghost.stunTimer = 3.0;
-            ghost.stunnedBy = h.name;
-            hostEngine.botStunCooldown = 8.5;
-            hostEngine.toast = `⛓️ ${h.name} TRAVOU o Fantasma por 3 segundos!`;
-            hostEngine.toastTimer = 3.0;
+            const gDist = Math.hypot(ghost.x - h.x, ghost.y - h.y);
+            // Bloqueio de parede/porta: a trava NUNCA atravessa paredes sólidas nem portas fechadas!
+            if (gDist < 220 && hasLineOfSight(h.x, h.y, ghost.x, ghost.y, sightObstacles)) {
+              h.stunCharges = 0;
+              ghost.stunTimer = 3.0;
+              ghost.stunnedBy = h.name;
+              hostEngine.botStunCooldown = 8.5;
+              hostEngine.toast = `⛓️ ${h.name} travou o Fantasma por 3 segundos!`;
+              hostEngine.toastTimer = 3.0;
+            }
           }
         }
       }
 
-      // Lanternas e Resgates
+      // Lanternas e Resgates (respeitam paredes e portas fechadas)
       for (const h of pList.filter(x => x.role === 'hunter')) {
         if (h.frozen) { h.turbo = false; continue; }
         h.turbo = h.turboReq && h.battery > 5;
@@ -1516,8 +1598,8 @@
           const dist = Math.hypot(ghost.x - h.x, ghost.y - h.y);
           const ang = Math.atan2(ghost.y - h.y, ghost.x - h.x);
           const diff = Math.abs(Math.atan2(Math.sin(ang - h.angle), Math.cos(ang - h.angle)));
-          // A luz da lanterna NÃO atravessa paredes!
-          if (dist <= range && diff <= spread && hasLineOfSight(h.x, h.y, ghost.x, ghost.y, hostEngine.walls)) {
+          // A luz da lanterna NÃO atravessa paredes nem portas fechadas!
+          if (dist <= range && diff <= spread && hasLineOfSight(h.x, h.y, ghost.x, ghost.y, sightObstacles)) {
             ghost.lit = true;
           }
         }
@@ -1525,11 +1607,18 @@
           const dist = Math.hypot(ally.x - h.x, ally.y - h.y);
           const ang = Math.atan2(ally.y - h.y, ally.x - h.x);
           const diff = Math.abs(Math.atan2(Math.sin(ang - h.angle), Math.cos(ang - h.angle)));
-          if (dist < 48 || (dist < 230 && diff <= spread && hasLineOfSight(h.x, h.y, ally.x, ally.y, hostEngine.walls))) {
+          if (dist < 48 || (dist < 230 && diff <= spread && hasLineOfSight(h.x, h.y, ally.x, ally.y, sightObstacles))) {
             ally.rescueProgress += 65 * dt;
             if (ally.rescueProgress >= 100) {
               ally.frozen = false;
               ally.rescueProgress = 0;
+              h.score = (h.score || 0) + 150;
+              hostEngine.toast = `🔦 ${h.name} salvou ${ally.name}! (+150 pts)`;
+              hostEngine.toastTimer = 3.0;
+            }
+          }
+        }
+      }
               h.score = (h.score || 0) + 150;
               hostEngine.toast = `🔦 ${h.name} salvou ${ally.name}! (+150 pts)`;
               hostEngine.toastTimer = 3.0;
@@ -1609,17 +1698,17 @@
           if (isStunned) {
             pl.moving = false;
           } else {
-            // O Fantasma é mais lento que os caçadores (180 base, 205 astral, 95 sob a luz da lanterna!)
-            const baseSpeed = pl.phaseTimer > 0 ? 205 : 180;
-            const speed = pl.lit ? 95 : baseSpeed;
+            // O Fantasma é mais lento e cadenciado: 155 base, 185 astral, 75 sob a luz da lanterna!
+            const baseSpeed = pl.phaseTimer > 0 ? 185 : 155;
+            const speed = pl.lit ? 75 : baseSpeed;
             const len = Math.hypot(pl.dx, pl.dy);
             pl.moving = len > 0.1;
             moveHostPlayer(pl, len > 0.01 ? (pl.dx / Math.max(1, len)) * speed * dt : 0, len > 0.01 ? (pl.dy / Math.max(1, len)) * speed * dt : 0, pl.phaseTimer > 0);
           }
         } else {
           if (pl.frozen) { pl.moving = false; continue; }
-          // Caçador é mais rápido que o fantasma: 210 base, 240 com turbo/corrida!
-          const speed = pl.turbo ? 240 : 210;
+          // Caçador é mais ágil: 200 base, 235 com turbo/corrida!
+          const speed = pl.turbo ? 235 : 200;
           const len = Math.hypot(pl.dx, pl.dy);
           pl.moving = len > 0.15;
           moveHostPlayer(pl, len > 0.01 ? (pl.dx / Math.max(1, len)) * speed * dt : 0, len > 0.01 ? (pl.dy / Math.max(1, len)) * speed * dt : 0, false);
@@ -1660,8 +1749,8 @@
               }
             }
           }
-          // O Fantasma só congela Caçadores se NÃO estiver travado pelos 3 segundos
-          if (ghost && (ghost.stunTimer || 0) <= 0 && Math.hypot(ghost.x - pl.x, ghost.y - pl.y) < 30) {
+          // O Fantasma só congela Caçadores com toque físico bem próximo (< 25px) e se não estiver travado
+          if (ghost && (ghost.stunTimer || 0) <= 0 && Math.hypot(ghost.x - pl.x, ghost.y - pl.y) < 25) {
             pl.frozen = true;
             pl.rescueProgress = 0;
             ghost.score = (ghost.score || 0) + 150;
@@ -1740,7 +1829,8 @@
             clones: hostEngine.clones,
             relics: hostEngine.relics,
             stations: hostEngine.stations,
-            walls: hostEngine.walls
+            walls: hostEngine.walls,
+            doors: hostEngine.doors || []
           };
           onServerStateUpdate(snapshot);
           if (netMode === 'p2p_host') {
@@ -1862,9 +1952,11 @@
       const genEl = document.getElementById('hud-generators');
       if (genEl) {
         const totalGen = (state.generators || []).length || 2;
-        genEl.textContent = `${state.generatorsActive || 0}/${totalGen}`;
+        const remainingGen = Math.max(0, totalGen - (state.generatorsActive || 0));
+        genEl.textContent = `${state.generatorsActive || 0}/${totalGen} (Faltam ${remainingGen})`;
       }
-      document.getElementById('hud-relics').textContent = `${state.relicsCollected}/${state.relicsTarget}`;
+      const remainingRelics = Math.max(0, (state.relicsTarget || 8) - (state.relicsCollected || 0));
+      document.getElementById('hud-relics').textContent = `${state.relicsCollected}/${state.relicsTarget} (Faltam ${remainingRelics})`;
       document.getElementById('hud-score').textContent = `${me.score || 0} pts`;
 
       const secs = Math.max(0, Math.ceil(state.timeLeft));
@@ -1892,8 +1984,8 @@
 
       if (me.role === 'ghost') {
         const isStunned = (me.stunTimer || 0) > 0;
-        roleBadge.textContent = isStunned ? `⛓️ TRAVADO! (${me.stunTimer.toFixed(1)}s)` : '👻 Fantasma';
-        roleBadge.className = isStunned ? 'text-xs font-bold text-cyan-300 animate-pulse' : 'text-xs font-bold text-purple-400';
+        roleBadge.textContent = isStunned ? '🧊 Congelado' : '👻 Fantasma';
+        roleBadge.className = isStunned ? 'text-xs font-bold text-sky-300' : 'text-xs font-bold text-purple-400';
 
         ghostBar.classList.remove('hidden');
         hunterBar.classList.add('hidden');
@@ -1917,12 +2009,12 @@
         const stunStatusEl = document.getElementById('ghost-stun-status');
         if (stunStatusEl) {
           stunStatusEl.textContent = isStunned
-            ? `⛓️ TRAVADO (${me.stunTimer.toFixed(1)}s)`
+            ? '🧊 Congelado'
             : `⛓️ Travas Caçadores: ${totalHunterStuns}`;
         }
 
         energyBox.innerHTML = isStunned
-          ? `⛓️ <span class="text-cyan-300">Travado ${me.stunTimer.toFixed(1)}s</span>`
+          ? '🧊 <span class="text-sky-300">Congelado</span>'
           : (active1
               ? '🌀 <span class="text-purple-300">Forma Astral!</span>'
               : '👻 <span class="text-purple-300">Visão Total</span>');
@@ -2148,7 +2240,65 @@
         ctx.strokeRect(w.x, w.y, w.w, w.h);
       });
 
-      // Fachos de Luz das Lanternas (NÃO ATRAVESSAM PAREDES! Raycasting de Iluminação)
+      // Portas dos Cômodos (Fantasma atravessa livre; Caçadores abrem em ~400ms)
+      (gameState.doors || []).forEach(d => {
+        ctx.save();
+        if (d.isOpen) {
+          // Porta aberta: vão livre com batente e folha recolhida
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(d.x, d.y, d.w, d.h);
+          ctx.fillStyle = 'rgba(120, 53, 15, 0.22)';
+          ctx.fillRect(d.x, d.y, d.w, d.h);
+          ctx.fillStyle = '#b45309';
+          if (d.w >= d.h) {
+            ctx.fillRect(d.x, d.y - 14, 8, 16);
+          } else {
+            ctx.fillRect(d.x - 14, d.y, 16, 8);
+          }
+        } else {
+          // Porta fechada: madeira sólida de mansão, batentes e maçaneta
+          ctx.fillStyle = '#3b1704';
+          ctx.fillRect(d.x, d.y, d.w, d.h);
+          ctx.strokeStyle = '#92400e';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(d.x, d.y, d.w, d.h);
+          
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 1;
+          if (d.w >= d.h) {
+            ctx.beginPath();
+            ctx.moveTo(d.x + d.w * 0.33, d.y); ctx.lineTo(d.x + d.w * 0.33, d.y + d.h);
+            ctx.moveTo(d.x + d.w * 0.66, d.y); ctx.lineTo(d.x + d.w * 0.66, d.y + d.h);
+            ctx.stroke();
+            // Maçaneta dourada
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath(); ctx.arc(d.x + d.w * 0.5, d.y + d.h * 0.5, 3.5, 0, Math.PI * 2); ctx.fill();
+          } else {
+            ctx.beginPath();
+            ctx.moveTo(d.x, d.y + d.h * 0.33); ctx.lineTo(d.x + d.w, d.y + d.h * 0.33);
+            ctx.moveTo(d.x, d.y + d.h * 0.66); ctx.lineTo(d.x + d.w, d.y + d.h * 0.66);
+            ctx.stroke();
+            // Maçaneta dourada
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath(); ctx.arc(d.x + d.w * 0.5, d.y + d.h * 0.5, 3.5, 0, Math.PI * 2); ctx.fill();
+          }
+
+          // Barra sutil quando caçador está empurrando/abrindo
+          if ((d.openTimer || 0) > 0) {
+            const prog = Math.min(1, d.openTimer / 0.4);
+            ctx.fillStyle = 'rgba(251, 191, 36, 0.45)';
+            ctx.fillRect(d.x, d.y, d.w * prog, d.h);
+          }
+        }
+        ctx.restore();
+      });
+
+      // Obstáculos para luz e visão (paredes + portas fechadas)
+      const closedDoors = (gameState.doors || []).filter(d => !d.isOpen);
+      const sightObstacles = [...(gameState.walls || []), ...closedDoors];
+
+      // Fachos de Luz das Lanternas (NÃO ATRAVESSAM PAREDES NEM PORTAS FECHADAS!)
       const blackoutActive = (gameState.blackoutTimer || 0) > 0;
       gameState.players.forEach(p => {
         if (p.role !== 'hunter' || p.frozen || (p.battery || 0) <= 0) return;
@@ -2157,8 +2307,8 @@
         const range = blackoutActive ? 150 : (p.turbo ? 350 : 275);
         const spread = p.turbo ? 0.56 : 0.43;
 
-        // Calcula o cone de luz que é bloqueado perfeitamente pelas paredes
-        const conePoints = computeLightConePolygon(rp.x, rp.y, aimAngle, spread, range, gameState.walls || []);
+        // Calcula o cone de luz que é bloqueado perfeitamente pelas paredes e portas fechadas
+        const conePoints = computeLightConePolygon(rp.x, rp.y, aimAngle, spread, range, sightObstacles);
 
         ctx.save();
         const grad = ctx.createRadialGradient(rp.x, rp.y, 12, rp.x, rp.y, range);
@@ -2206,52 +2356,32 @@
         if (p.role === 'ghost') {
           const distToMe = me ? Math.hypot(rp.x - (renderPlayers[me.id]?.x || me.x), rp.y - (renderPlayers[me.id]?.y || me.y)) : 999;
           const stunnedG = (p.stunTimer || 0) > 0;
-          const hasLos = me ? hasLineOfSight(renderPlayers[me.id]?.x || me.x, renderPlayers[me.id]?.y || me.y, rp.x, rp.y, gameState.walls || []) : false;
-          // O Caçador só vê o Fantasma se: estiver no mesmo papel OU o Fantasma estiver aceso por lanterna OU travado OU a menos de 95px COM linha de visão direta (sem paredes)!
+          const hasLos = me ? hasLineOfSight(renderPlayers[me.id]?.x || me.x, renderPlayers[me.id]?.y || me.y, rp.x, rp.y, sightObstacles) : false;
+          // O Caçador só vê o Fantasma se: estiver no mesmo papel OU o Fantasma estiver aceso por lanterna OU travado OU a menos de 95px COM linha de visão direta (sem paredes/portas)!
           if (!isGhostView && !p.lit && !stunnedG && (!hasLos || distToMe > 95)) return;
 
           ctx.save();
           if (p.phaseTimer > 0) ctx.globalAlpha = 0.55;
-          const auraGrad = ctx.createRadialGradient(rp.x, rp.y, 4, rp.x, rp.y, 36);
-          auraGrad.addColorStop(0, stunnedG ? 'rgba(34, 211, 238, 0.85)' : (p.lit ? 'rgba(239, 68, 68, 0.8)' : 'rgba(168, 85, 247, 0.7)'));
-          auraGrad.addColorStop(1, 'rgba(168, 85, 247, 0)');
+          
+          // Aura suave (quando travado, fica em um azul celeste suave sem efeitos exagerados)
+          const auraGrad = ctx.createRadialGradient(rp.x, rp.y, 4, rp.x, rp.y, 34);
+          auraGrad.addColorStop(0, stunnedG ? 'rgba(147, 197, 253, 0.65)' : (p.lit ? 'rgba(239, 68, 68, 0.8)' : 'rgba(168, 85, 247, 0.7)'));
+          auraGrad.addColorStop(1, stunnedG ? 'rgba(147, 197, 253, 0)' : 'rgba(168, 85, 247, 0)');
           ctx.fillStyle = auraGrad;
-          ctx.beginPath(); ctx.arc(rp.x, rp.y, 36, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(rp.x, rp.y, 34, 0, Math.PI * 2); ctx.fill();
 
-          ctx.fillStyle = stunnedG ? '#67e8f9' : (p.lit ? '#ef4444' : '#c084fc');
+          // Corpo suave do fantasma
+          ctx.fillStyle = stunnedG ? '#93c5fd' : (p.lit ? '#ef4444' : '#c084fc');
           ctx.beginPath(); ctx.arc(rp.x, rp.y, 17, 0, Math.PI * 2); ctx.fill();
-          ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+          ctx.lineWidth = 2.5; ctx.strokeStyle = stunnedG ? '#dbeafe' : '#ffffff'; ctx.stroke();
 
+          // Olhos
           ctx.fillStyle = '#ffffff';
           ctx.beginPath();
           ctx.arc(rp.x - 5, rp.y - 3, 3, 0, Math.PI * 2);
           ctx.arc(rp.x + 5, rp.y - 3, 3, 0, Math.PI * 2);
           ctx.fill();
 
-          // Correntes elétricas quando travado pelos Caçadores
-          if (stunnedG) {
-            ctx.globalAlpha = 1;
-            ctx.strokeStyle = '#22d3ee';
-            ctx.lineWidth = 3;
-            ctx.setLineDash([6, 4]);
-            ctx.lineDashOffset = -t * 20;
-            ctx.beginPath(); ctx.arc(rp.x, rp.y, 26, 0, Math.PI * 2); ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.lineWidth = 2;
-            for (let k = 0; k < 4; k++) {
-              const a = k * Math.PI / 2 + t * 0.5;
-              ctx.beginPath();
-              ctx.moveTo(rp.x + Math.cos(a) * 18, rp.y + Math.sin(a) * 18);
-              ctx.lineTo(rp.x + Math.cos(a + 0.25) * 30, rp.y + Math.sin(a + 0.25) * 30);
-              ctx.lineTo(rp.x + Math.cos(a - 0.1) * 38, rp.y + Math.sin(a - 0.1) * 38);
-              ctx.stroke();
-            }
-            // Barra de tempo restante (3s)
-            ctx.strokeStyle = '#a5f3fc'; ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.arc(rp.x, rp.y, 31, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (p.stunTimer / 3));
-            ctx.stroke();
-          }
           ctx.restore();
         } else {
           ctx.save();
@@ -2285,10 +2415,10 @@
         if (p.role === 'ghost') {
           const distToMe = me ? Math.hypot(rp.x - (renderPlayers[me.id]?.x || me.x), rp.y - (renderPlayers[me.id]?.y || me.y)) : 999;
           const stunnedTag = (p.stunTimer || 0) > 0;
-          const hasLos = me ? hasLineOfSight(renderPlayers[me.id]?.x || me.x, renderPlayers[me.id]?.y || me.y, rp.x, rp.y, gameState.walls || []) : false;
+          const hasLos = me ? hasLineOfSight(renderPlayers[me.id]?.x || me.x, renderPlayers[me.id]?.y || me.y, rp.x, rp.y, sightObstacles) : false;
           if (!isGhostView && !p.lit && !stunnedTag && (!hasLos || distToMe > 95)) return;
           if (stunnedTag) {
-            drawTagPill(ctx, `⛓️ TRAVADO! (${p.stunTimer.toFixed(1)}s)`, rp.x, rp.y - 42, '#67e8f9');
+            drawTagPill(ctx, '🧊 Congelado', rp.x, rp.y - 28, '#93c5fd');
           } else {
             drawTagPill(ctx, p.lit ? '🔥 QUEIMANDO!' : `👻 ${p.name}`, rp.x, rp.y - 24, p.lit ? '#fca5a5' : '#e9d5ff');
           }
@@ -2297,7 +2427,7 @@
         }
       });
 
-      // Fog of War (Para Caçadores - A luz da lanterna NÃO abre além das paredes!)
+      // Fog of War (Para Caçadores - A luz da lanterna NÃO abre além das paredes nem portas!)
       if (!isGhostView && me) {
         fogCtx.clearRect(0, 0, W, H);
         fogCtx.globalCompositeOperation = 'source-over';
@@ -2319,7 +2449,7 @@
             const aimAngle = (p.id === clientId) ? inputState.angle : rp.angle;
             const range = blackoutActive ? 150 : (p.turbo ? 350 : 275);
             const spread = p.turbo ? 0.58 : 0.45;
-            const conePoints = computeLightConePolygon(rp.x, rp.y, aimAngle, spread, range, gameState.walls || []);
+            const conePoints = computeLightConePolygon(rp.x, rp.y, aimAngle, spread, range, sightObstacles);
 
             const coneGrad = fogCtx.createRadialGradient(rp.x, rp.y, 10, rp.x, rp.y, range);
             coneGrad.addColorStop(0, 'rgba(0,0,0,1)');
@@ -2340,88 +2470,42 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
 
       // ======================================================================
-      // HUD DA CÂMERA DO CAÇADOR: SETAS GUIA PARA OS TESOUROS QUE FALTAM
-      // Como o Caçador tem visão fechada, as setinhas na borda ajudam a achar!
+      // HUD LIMPO (SEM SETAS DE TESOUROS OU GERADORES POLUINDO A TELA)
+      // Mantém apenas alerta de socorro discreto se um aliado for congelado
       // ======================================================================
       if (!isGhostView && me && !me.frozen) {
         const rpMe = renderPlayers[me.id] || me;
-        const uncollected = (gameState.relics || []).filter(r => !r.collected);
-        
-        uncollected.forEach(rel => {
-          // Coordenada do tesouro projetada na tela (espaço de visualização da câmera)
-          const sx = (rel.x - camera.x) * camera.zoom + W / 2;
-          const sy = (rel.y - camera.y) * camera.zoom + H / 2;
-          
-          // Se estiver fora da tela visível do Caçador, desenha uma setinha indicadora na borda
-          const margin = 38;
-          const isOffScreen = sx < margin || sx > W - margin || sy < margin || sy > H - margin;
-          
-          if (isOffScreen) {
-            const angleToRelic = Math.atan2(rel.y - rpMe.y, rel.x - rpMe.x);
-            // Ponto de interseção com a borda da tela
-            const edgeX = Math.max(margin, Math.min(W - margin, W / 2 + Math.cos(angleToRelic) * (W / 2 - margin)));
-            const edgeY = Math.max(margin, Math.min(H - margin, H / 2 + Math.sin(angleToRelic) * (H / 2 - margin)));
-            const distM = Math.round(Math.hypot(rel.x - rpMe.x, rel.y - rpMe.y) / 10);
-
-            ctx.save();
-            ctx.translate(edgeX, edgeY);
-            ctx.rotate(angleToRelic);
-            
-            // Desenha seta pulsante dourada
-            ctx.fillStyle = '#facc15';
-            ctx.shadowColor = '#eab308';
-            ctx.shadowBlur = 8;
-            ctx.beginPath();
-            ctx.moveTo(14, 0);
-            ctx.lineTo(-6, -8);
-            ctx.lineTo(-2, 0);
-            ctx.lineTo(-6, 8);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-
-            // Distância em metros embaixo da setinha
-            ctx.save();
-            ctx.font = 'bold 10px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = 'rgba(0,0,0,0.7)';
-            ctx.fillRect(edgeX - 16, edgeY + 10, 32, 13);
-            ctx.fillStyle = '#fde047';
-            ctx.fillText(`${distM}m`, edgeX, edgeY + 20);
-            ctx.restore();
-          }
-        });
-
-        // Setas Guia para os Geradores que faltam ativar ⚡
-        const uncompletedGenerators = (gameState.generators || []).filter(g => !g.completed);
-        uncompletedGenerators.forEach(gen => {
-          const sx = (gen.x - camera.x) * camera.zoom + W / 2;
-          const sy = (gen.y - camera.y) * camera.zoom + H / 2;
+        // Alerta na borda se um colega estiver congelado precisando de resgate!
+        const frozenAllies = (gameState.players || []).filter(p => p.role === 'hunter' && p.frozen && p.id !== me.id);
+        frozenAllies.forEach(ally => {
+          const rpAlly = renderPlayers[ally.id] || ally;
+          const sx = (rpAlly.x - camera.x) * camera.zoom + W / 2;
+          const sy = (rpAlly.y - camera.y) * camera.zoom + H / 2;
           const margin = 42;
           if (sx < margin || sx > W - margin || sy < margin || sy > H - margin) {
-            const angleToGen = Math.atan2(gen.y - rpMe.y, gen.x - rpMe.x);
-            const edgeX = Math.max(margin, Math.min(W - margin, W / 2 + Math.cos(angleToGen) * (W / 2 - margin)));
-            const edgeY = Math.max(margin, Math.min(H - margin, H / 2 + Math.sin(angleToGen) * (H / 2 - margin)));
-            const distM = Math.round(Math.hypot(gen.x - rpMe.x, gen.y - rpMe.y) / 10);
-
+            const angleToAlly = Math.atan2(rpAlly.y - rpMe.y, rpAlly.x - rpMe.x);
+            const edgeX = Math.max(margin, Math.min(W - margin, W / 2 + Math.cos(angleToAlly) * (W / 2 - margin)));
+            const edgeY = Math.max(margin, Math.min(H - margin, H / 2 + Math.sin(angleToAlly) * (H / 2 - margin)));
+            
             ctx.save();
             ctx.translate(edgeX, edgeY);
-            ctx.rotate(angleToGen);
-            ctx.fillStyle = '#34d399';
-            ctx.shadowColor = '#10b981';
-            ctx.shadowBlur = 8;
+            ctx.rotate(angleToAlly);
+            ctx.fillStyle = '#38bdf8';
+            ctx.shadowColor = '#0284c7';
+            ctx.shadowBlur = 10;
             ctx.beginPath();
             ctx.moveTo(14, 0);
-            ctx.lineTo(-6, -8);
-            ctx.lineTo(-2, 0);
-            ctx.lineTo(-6, 8);
+            ctx.lineTo(-7, -9);
+            ctx.lineTo(-3, 0);
+            ctx.lineTo(-7, 9);
             ctx.closePath();
             ctx.fill();
             ctx.restore();
 
-            drawTagPill(ctx, `⚡ ${gen.name} (${distM}m)`, edgeX, edgeY + 16, '#34d399');
+            drawTagPill(ctx, `🆘 ${ally.name}`, edgeX, edgeY + 16, '#7dd3fc');
           }
         });
+      }
 
         // Alerta na borda se um colega estiver congelado precisando de resgate!
         const frozenAllies = (gameState.players || []).filter(p => p.role === 'hunter' && p.frozen && p.id !== me.id);
