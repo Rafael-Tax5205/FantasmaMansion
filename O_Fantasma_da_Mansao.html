@@ -1,0 +1,2106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>O Fantasma da Mansão — 3 Fases & Visão Limpa</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      background-color: #07070b;
+      color: #f4f4f5;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      touch-action: none;
+    }
+    @keyframes heartbeat {
+      0%, 100% { opacity: 0.15; }
+      50% { opacity: 0.78; }
+    }
+    .danger-vignette {
+      box-shadow: inset 0 0 85px 28px rgba(239, 68, 68, 0.75);
+      animation: heartbeat 0.65s infinite ease-in-out;
+    }
+    .frozen-vignette {
+      box-shadow: inset 0 0 90px 30px rgba(56, 189, 248, 0.75);
+    }
+  </style>
+</head>
+<body class="relative w-screen h-[100dvh] flex flex-col items-center justify-center bg-zinc-950" onclick="tryAutoFullscreen()">
+
+  <!-- ====================================================================== -->
+  <!-- TELA DE LOBBY                                                          -->
+  <!-- ====================================================================== -->
+  <div id="lobby-screen" class="z-30 w-full h-full overflow-y-auto flex items-center justify-center p-2.5 md:p-6">
+    <div class="w-full max-w-5xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-4 md:p-6 flex flex-col gap-4">
+
+      <!-- Cabeçalho -->
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl md:text-4xl">👻</span>
+          <div>
+            <h1 class="text-lg md:text-2xl font-bold text-white tracking-tight">O Fantasma da Mansão — 3 Fases</h1>
+            <p class="text-xs text-emerald-400 font-medium">
+              ✅ Visão 100% Limpa (Sem Sobreposição) • 3 Fases Sorteadas • Recolham TODOS os Tesouros!
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-sound" onclick="toggleAudio()" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 border border-zinc-700 transition">
+            🔊 Som: Ligado
+          </button>
+          <button onclick="forceFullscreenNow()" class="px-3.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-xs font-bold text-amber-300 border border-amber-400/50 transition">
+            ⛶ Tela Cheia
+          </button>
+        </div>
+      </div>
+
+      <!-- Grid Principal -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+
+        <!-- Coluna Esquerda: Nome, Papel, Fase e Lista da Sala (7 colunas) -->
+        <div class="md:col-span-7 flex flex-col gap-3">
+
+          <!-- 1. Seu Jogador -->
+          <div class="bg-zinc-950/90 border border-zinc-800 rounded-xl p-3.5">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">1. Seu Nome e Papel</h2>
+            <div class="flex flex-col sm:flex-row gap-2.5">
+              <input id="player-name" type="text" maxlength="14" placeholder="Seu Nome"
+                class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
+                onchange="updateMyProfile()" onkeyup="updateMyProfile()" />
+              <div class="flex gap-2">
+                <button id="role-hunter-btn" onclick="selectRole('hunter')"
+                  class="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold border transition flex items-center justify-center gap-1.5">
+                  🔦 Caçador
+                </button>
+                <button id="role-ghost-btn" onclick="selectRole('ghost')"
+                  class="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold border transition flex items-center justify-center gap-1.5">
+                  👻 Fantasma
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Jogadores e Placar Geral -->
+          <div class="bg-zinc-950/90 border border-zinc-800 rounded-xl p-3.5 flex-1 flex flex-col justify-between">
+            <div>
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                  2. Sala & Ranking de Pontos (<span id="player-count">1</span>/4)
+                </h2>
+                <div class="flex gap-1.5">
+                  <button onclick="sendLobbyCommand('add_bot')" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border border-zinc-700 transition">
+                    🤖 +Bot IA
+                  </button>
+                  <button onclick="sendLobbyCommand('clear_bots')" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-400 border border-zinc-700 transition">
+                    Limpar Bots
+                  </button>
+                </div>
+              </div>
+              <div id="players-list" class="space-y-2 min-h-[140px]"></div>
+            </div>
+
+            <!-- Seletor de Fase + Iniciar -->
+            <div class="mt-4 pt-3 border-t border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+              <div class="flex items-center gap-2 text-xs text-zinc-300">
+                <span>🗺️ Fase:</span>
+                <span class="px-2.5 py-1 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-200 font-bold">
+                  🎲 Sorteio Automático (3 Fases)
+                </span>
+              </div>
+              <button onclick="startWithFullscreen()"
+                class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-zinc-950 font-extrabold text-sm shadow-lg transition transform active:scale-95">
+                ▶ INICIAR PARTIDA (TELA CHEIA)
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Coluna Direita: As 3 Fases + Sala P2P (5 colunas) -->
+        <div class="md:col-span-5 flex flex-col gap-3">
+
+          <!-- As 3 Fases do Jogo -->
+          <div class="bg-zinc-950/90 border border-zinc-800 rounded-xl p-3.5 text-xs space-y-2">
+            <div class="font-bold text-amber-400 text-xs uppercase tracking-wider">🗺️ 3 Fases Sorteadas a Cada Partida:</div>
+            <div class="space-y-1.5 text-zinc-300">
+              <div class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-between">
+                <span>🏰 <strong>Fase 1:</strong> Mansão Gótica</span>
+                <span class="text-amber-300 font-semibold">8 Tesouros 💎</span>
+              </div>
+              <div class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-between">
+                <span>🏥 <strong>Fase 2:</strong> Hospital Abandonado</span>
+                <span class="text-sky-300 font-semibold">8 Tesouros 💎</span>
+              </div>
+              <div class="p-2 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-between">
+                <span>🌲 <strong>Fase 3:</strong> Catacumbas & Cemitério</span>
+                <span class="text-emerald-300 font-semibold">8 Tesouros 💎</span>
+              </div>
+            </div>
+            <p class="text-[11px] text-zinc-400 pt-1">
+              🏆 <strong>Regra:</strong> Recolham <strong>TODOS os 8 tesouros</strong>! Cada Caçador também tem <strong>1 botão ⛓️ Travar (3s)</strong> para congelar o Fantasma!
+            </p>
+          </div>
+
+          <!-- Painel Multiplayer P2P por Código -->
+          <div class="bg-zinc-950/90 border border-zinc-800 rounded-xl p-3.5 flex flex-col gap-2.5">
+            <div class="flex items-center justify-between">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-amber-400">
+                🌐 Conectar Celulares (Código)
+              </h2>
+              <span id="p2p-badge" class="text-[11px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Modo Local</span>
+            </div>
+
+            <div id="host-panel" class="bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 text-center space-y-1.5">
+              <button id="btn-create-room" onclick="createP2PRoom()"
+                class="w-full py-1.5 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition shadow">
+                💻 Gerar Código da Sala (Host)
+              </button>
+              <div id="room-code-display" class="hidden">
+                <div class="text-[11px] text-zinc-400">Código da Sala:</div>
+                <div id="room-code-number" class="text-2xl font-black tracking-widest text-amber-400 font-mono select-all">----</div>
+                <div id="share-box" class="hidden mt-2 space-y-1.5">
+                  <div class="text-[11px] text-emerald-300 font-semibold">📲 Mande este link (ou mostre o QR) para os celulares:</div>
+                  <div class="flex gap-1.5">
+                    <input id="share-link" readonly class="flex-1 min-w-0 bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-[11px] font-mono text-zinc-200" />
+                    <button onclick="copyShareLink()" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold">Copiar</button>
+                  </div>
+                  <img id="share-qr" alt="QR Code da sala" class="mx-auto w-32 h-32 rounded bg-white p-1" />
+                </div>
+              </div>
+            </div>
+
+            <div id="join-panel" class="flex gap-2">
+              <input id="join-code-input" type="text" maxlength="4" placeholder="Código (ex: 4821)"
+                class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center uppercase text-white focus:outline-none focus:border-amber-400" />
+              <button onclick="joinP2PRoom()"
+                class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition">
+                📱 Entrar (Tela Cheia)
+              </button>
+            </div>
+            <div id="p2p-msg" class="text-[11px] text-center text-zinc-400 min-h-[14px]"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- TELA DO JOGO (LAYOUT EM 3 FAIXAS: TOPO + MAPA LIVRE + BASE DE PODERES) -->
+  <!-- ====================================================================== -->
+  <div id="game-screen" class="hidden relative w-screen h-[100dvh] flex flex-col bg-zinc-950 overflow-hidden">
+
+    <!-- 1. FAIXA DO TOPO (Fora do Mapa - NUNCA cobre as paredes superiores!) -->
+    <header class="shrink-0 w-full h-10 bg-zinc-950 border-b border-zinc-800 px-3 flex items-center justify-between gap-2 z-20">
+      <div class="flex items-center gap-2 md:gap-3 overflow-x-auto whitespace-nowrap">
+        <span id="hud-stage-name" class="text-xs font-extrabold text-amber-300">🏰 Fase 1</span>
+        <span class="text-zinc-700">|</span>
+        <span id="hud-role-badge" class="text-xs font-bold text-purple-400">👻 Fantasma</span>
+        <span class="text-zinc-700">|</span>
+        <span class="text-xs font-semibold text-sky-300">
+          💎 Tesouros: <strong id="hud-relics">0/8</strong>
+        </span>
+        <span class="text-zinc-700">|</span>
+        <span class="text-xs font-semibold text-amber-400">
+          🏆 <strong id="hud-score">0 pts</strong>
+        </span>
+        <span class="text-zinc-700">|</span>
+        <span class="text-xs font-mono font-bold text-zinc-200" id="hud-timer">03:00</span>
+      </div>
+
+      <!-- Aviso de Eventos centralizado na barra superior -->
+      <div id="hud-toast" class="hidden md:block bg-purple-950/90 border border-purple-400/40 text-purple-100 px-3 py-0.5 rounded-full text-xs font-semibold truncate max-w-md">
+        ⚡ Evento!
+      </div>
+
+      <div class="flex items-center gap-1.5 shrink-0">
+        <div id="hud-energy-box" class="bg-zinc-900 border border-zinc-700 px-2.5 py-0.5 rounded-full text-xs font-semibold text-emerald-400 whitespace-nowrap">
+          🔋 100%
+        </div>
+        <button onclick="forceFullscreenNow()" class="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 px-2 py-0.5 rounded-full text-xs font-bold" title="Tela Cheia">
+          ⛶
+        </button>
+        <button onclick="sendLobbyCommand('back_to_lobby')" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-0.5 rounded-full text-xs font-medium">
+          ⏹ Sala
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. ÁREA CENTRAL DO MAPA (100% Visível de Ponta a Ponta, Sem Nada em Cima!) -->
+    <main class="relative flex-1 min-h-0 w-full flex items-center justify-center bg-zinc-950 overflow-hidden">
+      <canvas id="game-canvas" width="1600" height="840" class="w-full h-full object-contain"></canvas>
+
+      <!-- Efeito de Borda (Batimento Cardíaco / Congelado) -->
+      <div id="screen-vignette" class="pointer-events-none absolute inset-0 transition-opacity duration-300"></div>
+
+      <!-- Controles Touch Duplos (Apenas em Celulares) -->
+      <div id="touch-controls" class="hidden absolute inset-0 pointer-events-none z-20 flex justify-between items-end p-3">
+        <div id="stick-left-zone" class="pointer-events-auto relative w-24 h-24 rounded-full border-2 border-white/25 bg-black/40 backdrop-blur-sm flex items-center justify-center touch-none">
+          <div id="stick-left-knob" class="w-10 h-10 rounded-full bg-white/45 border border-white/70 shadow-md"></div>
+          <span class="absolute -top-4 text-[10px] font-bold text-white/70">ANDAR</span>
+        </div>
+
+        <div class="flex items-end gap-2.5">
+          <div class="flex flex-col gap-2 items-center">
+            <button id="btn-touch-stun"
+              onclick="triggerHunterStun()"
+              class="pointer-events-auto px-3 py-2 rounded-full bg-cyan-500/90 active:bg-cyan-400 border-2 border-cyan-200 shadow-lg flex flex-col items-center justify-center text-zinc-950 transition">
+              <span class="text-sm leading-none">⛓️</span>
+              <span id="btn-touch-stun-label" class="text-[10px] font-extrabold whitespace-nowrap">Travar 3s</span>
+            </button>
+
+            <button id="btn-touch-turbo"
+              onpointerdown="setTurboActive(true)" onpointerup="setTurboActive(false)" onpointercancel="setTurboActive(false)"
+              class="pointer-events-auto w-13 h-13 px-3 py-2 rounded-full bg-amber-500/85 active:bg-amber-400 border-2 border-amber-200 shadow-lg flex flex-col items-center justify-center text-zinc-950">
+              <span class="text-base leading-none">⚡</span>
+              <span class="text-[10px] font-extrabold">Turbo</span>
+            </button>
+          </div>
+
+          <div id="stick-right-zone" class="pointer-events-auto relative w-24 h-24 rounded-full border-2 border-amber-400/40 bg-amber-950/35 backdrop-blur-sm flex items-center justify-center touch-none">
+            <div id="stick-right-knob" class="w-10 h-10 rounded-full bg-amber-400/65 border border-amber-200 shadow-md"></div>
+            <span class="absolute -top-4 text-[10px] font-bold text-amber-300/85">LANTERNA</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 3. FAIXA INFERIOR DEDICADA (Fora do Mapa - NUNCA tampa a parte de baixo do mapa!) -->
+    <footer id="bottom-hud-bar" class="shrink-0 w-full h-12 bg-zinc-950 border-t border-zinc-800 px-3 flex items-center justify-center z-20">
+
+      <!-- Barra de Poderes do Fantasma em Linha Única Limpa (Sem quebra de texto!) -->
+      <div id="ghost-skillbar" class="hidden flex items-center gap-2 md:gap-3 overflow-x-auto whitespace-nowrap">
+        <span class="hidden xl:inline-block text-xs text-zinc-400 mr-1">
+          Mover: <strong class="text-zinc-200">[WASD / Setas]</strong>
+        </span>
+
+        <button onclick="triggerGhostSkill(1)" class="flex items-center gap-2 px-3 py-1 rounded-lg bg-purple-950/70 hover:bg-purple-900 border border-purple-500/50 transition active:scale-95">
+          <span>🌀</span>
+          <span class="text-xs font-bold text-white">Forma Astral</span>
+          <span class="px-1.5 py-0.5 rounded bg-purple-600 text-[11px] font-mono font-bold text-white">1 / Espaço</span>
+          <span id="skill-cd-1" class="text-xs font-bold text-emerald-400">Pronto</span>
+        </button>
+
+        <button onclick="triggerGhostSkill(2)" class="flex items-center gap-2 px-3 py-1 rounded-lg bg-indigo-950/70 hover:bg-indigo-900 border border-indigo-500/50 transition active:scale-95">
+          <span>🌑</span>
+          <span class="text-xs font-bold text-white">Apagão</span>
+          <span class="px-1.5 py-0.5 rounded bg-indigo-600 text-[11px] font-mono font-bold text-white">2 / Q</span>
+          <span id="skill-cd-2" class="text-xs font-bold text-emerald-400">Pronto</span>
+        </button>
+
+        <button onclick="triggerGhostSkill(3)" class="flex items-center gap-2 px-3 py-1 rounded-lg bg-pink-950/70 hover:bg-pink-900 border border-pink-500/50 transition active:scale-95">
+          <span>👥</span>
+          <span class="text-xs font-bold text-white">Clone Assustador</span>
+          <span class="px-1.5 py-0.5 rounded bg-pink-600 text-[11px] font-mono font-bold text-white">3 / E</span>
+          <span id="skill-cd-3" class="text-xs font-bold text-emerald-400">Pronto</span>
+        </button>
+
+        <button onclick="triggerGhostSkill(4)" class="flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/50 transition active:scale-95">
+          <span>⚡</span>
+          <span class="text-xs font-bold text-white">Salto Sombrio</span>
+          <span class="px-1.5 py-0.5 rounded bg-emerald-600 text-[11px] font-mono font-bold text-white">4 / R</span>
+          <span id="skill-cd-4" class="text-xs font-bold text-emerald-400">Pronto</span>
+        </button>
+
+        <span id="ghost-stun-status" class="px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-500/40 text-xs font-bold text-cyan-300">
+          ⛓️ Travas Caçadores: 3
+        </span>
+      </div>
+
+      <!-- Barra de Controles e Poderes para Caçador -->
+      <div id="hunter-pc-bar" class="hidden flex items-center gap-3 text-xs text-zinc-300 whitespace-nowrap overflow-x-auto">
+        <span class="hidden md:inline"><strong>[WASD / Setas]</strong> Mover</span>
+        <span class="hidden md:inline">•</span>
+        <span class="hidden md:inline"><strong>[Mouse]</strong> Lanterna 360°</span>
+        <span class="hidden md:inline">•</span>
+        <span class="hidden sm:inline"><strong>[Espaço / Clique]</strong> ⚡ Turbo de Luz</span>
+        <button id="btn-pc-stun" onclick="triggerHunterStun()"
+          class="flex items-center gap-2 px-3 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-400/60 transition active:scale-95">
+          <span>⛓️</span>
+          <span class="text-xs font-bold text-white">Travar Fantasma (3s)</span>
+          <span class="px-1.5 py-0.5 rounded bg-cyan-600 text-[11px] font-mono font-bold text-white">E / 2</span>
+          <span id="hunter-stun-cd" class="text-xs font-bold text-emerald-400">Pronto (1x)</span>
+        </button>
+      </div>
+
+    </footer>
+
+    <!-- Modal de Fim de Partida + Ranking de Pontos -->
+    <div id="gameover-modal" class="hidden absolute inset-0 z-30 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+      <div class="bg-zinc-900 border border-zinc-700 rounded-2xl max-w-lg w-full p-5 text-center shadow-2xl space-y-3.5">
+        <div id="gameover-icon" class="text-4xl">🏆</div>
+        <h2 id="gameover-title" class="text-2xl font-extrabold text-white">Fim da Fase!</h2>
+        <p id="gameover-desc" class="text-xs md:text-sm text-zinc-300"></p>
+
+        <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-left space-y-1.5">
+          <div class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-1">🏆 Ranking de Pontos & Tesouros:</div>
+          <div id="gameover-scoreboard" class="space-y-1"></div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-2.5 justify-center pt-1">
+          <button onclick="startWithFullscreen()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-zinc-950 font-extrabold text-sm shadow-lg">
+            🎲 Sortear Próxima Fase e Jogar!
+          </button>
+          <button onclick="sendLobbyCommand('back_to_lobby')" class="px-5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-sm border border-zinc-700">
+            🏠 Voltar à Sala
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ========================================================================
+    // TELA CHEIA AUTOMÁTICA NO CELULAR
+    // ========================================================================
+    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+    function forceFullscreenNow() {
+      const docEl = document.documentElement;
+      const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
+      if (req && !document.fullscreenElement && !document.webkitFullscreenElement) {
+        req.call(docEl).then(() => {
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+          }
+        }).catch(() => {});
+      }
+      window.scrollTo(0, 1);
+    }
+
+    function tryAutoFullscreen() {
+      if (isTouchDevice) forceFullscreenNow();
+    }
+
+    window.startWithFullscreen = function() {
+      tryAutoFullscreen();
+      sendLobbyCommand('start_game');
+    };
+
+    // ========================================================================
+    // DEFINIÇÃO DAS 3 FASES (1600 x 840 - COORDENADAS 100% SEM SOBREPOSIÇÃO!)
+    // ========================================================================
+    const MAP_W = 1600;
+    const MAP_H = 840;
+
+    const STAGES = [
+      {
+        id: 1,
+        name: '🏰 Fase 1: Mansão Gótica',
+        floorGhost: '#110a22',
+        floorHunter: '#18181f',
+        wallGhost: '#3b1d6e',
+        wallStrokeGhost: '#6b21a8',
+        wallHunter: '#3f3f46',
+        wallStrokeHunter: '#52525b',
+        // Textos posicionados em áreas abertas, longe de paredes e longe das recargas
+        rooms: [
+          { name: 'BIBLIOTECA', x: 210, y: 150 },
+          { name: 'SALÃO NOBRE', x: 800, y: 95 },
+          { name: 'LABORATÓRIO', x: 1380, y: 150 },
+          { name: 'ALA OESTE', x: 340, y: 420 },
+          { name: 'JARDIM INTERNO', x: 800, y: 380 },
+          { name: 'ALA LESTE', x: 1260, y: 420 },
+          { name: 'COZINHA & ADEGA', x: 210, y: 690 },
+          { name: 'CRIPTA ANTIGA', x: 1380, y: 690 }
+        ],
+        walls: [
+          { x: 0, y: 0, w: 1600, h: 20, border: true },
+          { x: 0, y: 820, w: 1600, h: 20, border: true },
+          { x: 0, y: 0, w: 20, h: 840, border: true },
+          { x: 1580, y: 0, w: 20, h: 840, border: true },
+          { x: 420, y: 20, w: 20, h: 180 },
+          { x: 20, y: 280, w: 260, h: 20 },
+          { x: 360, y: 280, w: 80, h: 20 },
+          { x: 660, y: 160, w: 280, h: 20 },
+          { x: 1160, y: 20, w: 20, h: 180 },
+          { x: 1160, y: 280, w: 80, h: 20 },
+          { x: 1320, y: 280, w: 260, h: 20 },
+          { x: 610, y: 340, w: 20, h: 160 },
+          { x: 970, y: 340, w: 20, h: 160 },
+          { x: 660, y: 660, w: 280, h: 20 },
+          { x: 20, y: 540, w: 260, h: 20 },
+          { x: 420, y: 540, w: 20, h: 190 },
+          { x: 1320, y: 540, w: 260, h: 20 },
+          { x: 1160, y: 540, w: 20, h: 190 }
+        ],
+        stations: [
+          { x: 800, y: 235 }, { x: 800, y: 750 }, { x: 120, y: 420 }, { x: 1480, y: 420 }
+        ],
+        treasureSpots: [
+          [120, 95], [340, 210], [1480, 95], [1260, 210],
+          [800, 460], [120, 750], [1480, 750], [510, 420]
+        ]
+      },
+      {
+        id: 2,
+        name: '🏥 Fase 2: Hospital Abandonado',
+        floorGhost: '#081c24',
+        floorHunter: '#111b20',
+        wallGhost: '#155e75',
+        wallStrokeGhost: '#22d3ee',
+        wallHunter: '#334155',
+        wallStrokeHunter: '#64748b',
+        // Coordenadas corrigidas: nenhum nome de sala cruza paredes ou fica sob o círculo RECARGA!
+        rooms: [
+          { name: 'UTI & TRIAGEM', x: 230, y: 90 },
+          { name: 'RECEPÇÃO CENTRAL', x: 800, y: 205 },
+          { name: 'CENTRO CIRÚRGICO', x: 1370, y: 90 },
+          { name: 'ALA OESTE', x: 390, y: 420 },
+          { name: 'LABORATÓRIO BIO', x: 800, y: 425 },
+          { name: 'ALA LESTE', x: 1210, y: 420 },
+          { name: 'FARMÁCIA', x: 230, y: 745 },
+          { name: 'NECROTÉRIO', x: 1370, y: 745 }
+        ],
+        walls: [
+          { x: 0, y: 0, w: 1600, h: 20, border: true },
+          { x: 0, y: 820, w: 1600, h: 20, border: true },
+          { x: 0, y: 0, w: 20, h: 840, border: true },
+          { x: 1580, y: 0, w: 20, h: 840, border: true },
+          // Corredores Superiores
+          { x: 20, y: 240, w: 450, h: 20 },
+          { x: 580, y: 240, w: 440, h: 20 },
+          { x: 1130, y: 240, w: 450, h: 20 },
+          { x: 470, y: 20, w: 20, h: 150 },
+          { x: 1110, y: 20, w: 20, h: 150 },
+          // Divisórias Centrais (em x=250 e x=1330, longe dos textos ALA OESTE/LESTE)
+          { x: 250, y: 340, w: 20, h: 160 },
+          { x: 520, y: 340, w: 210, h: 20 },
+          { x: 870, y: 340, w: 210, h: 20 },
+          { x: 1330, y: 340, w: 20, h: 160 },
+          { x: 520, y: 500, w: 210, h: 20 },
+          { x: 870, y: 500, w: 210, h: 20 },
+          // Corredores Inferiores
+          { x: 20, y: 600, w: 450, h: 20 },
+          { x: 580, y: 600, w: 440, h: 20 },
+          { x: 1130, y: 600, w: 450, h: 20 },
+          { x: 470, y: 680, w: 20, h: 140 },
+          { x: 1110, y: 680, w: 20, h: 140 }
+        ],
+        stations: [
+          { x: 800, y: 105 }, { x: 800, y: 740 }, { x: 120, y: 420 }, { x: 1480, y: 420 }
+        ],
+        treasureSpots: [
+          [110, 165], [380, 165], [1490, 165], [1220, 165],
+          [640, 420], [960, 420], [110, 745], [1490, 745]
+        ]
+      },
+      {
+        id: 3,
+        name: '🌲 Fase 3: Catacumbas & Cemitério',
+        floorGhost: '#0c1f17',
+        floorHunter: '#121a16',
+        wallGhost: '#14532d',
+        wallStrokeGhost: '#4ade80',
+        wallHunter: '#3f4f46',
+        wallStrokeHunter: '#718078',
+        rooms: [
+          { name: 'CAPELA ABANDONADA', x: 180, y: 85 },
+          { name: 'PORTÃO NORTE', x: 800, y: 175 },
+          { name: 'MAUSOLÉU REAL', x: 1420, y: 85 },
+          { name: 'BOSQUE SOMBRIO', x: 260, y: 340 },
+          { name: 'ALTAR DAS ALMAS', x: 800, y: 425 },
+          { name: 'LAGO DA NEBLINA', x: 1340, y: 340 },
+          { name: 'COVIL DAS SOMBRAS', x: 180, y: 760 },
+          { name: 'TÚMULO ANTIGO', x: 1420, y: 760 }
+        ],
+        walls: [
+          { x: 0, y: 0, w: 1600, h: 20, border: true },
+          { x: 0, y: 820, w: 1600, h: 20, border: true },
+          { x: 0, y: 0, w: 20, h: 840, border: true },
+          { x: 1580, y: 0, w: 20, h: 840, border: true },
+          { x: 330, y: 120, w: 110, h: 110 },
+          { x: 1160, y: 120, w: 110, h: 110 },
+          { x: 640, y: 205, w: 320, h: 22 },
+          { x: 180, y: 390, w: 170, h: 70 },
+          { x: 1250, y: 390, w: 170, h: 70 },
+          { x: 730, y: 340, w: 140, h: 22 },
+          { x: 730, y: 485, w: 140, h: 22 },
+          { x: 560, y: 330, w: 22, h: 180 },
+          { x: 1018, y: 330, w: 22, h: 180 },
+          { x: 330, y: 610, w: 110, h: 110 },
+          { x: 1160, y: 610, w: 110, h: 110 },
+          { x: 640, y: 635, w: 320, h: 22 }
+        ],
+        stations: [
+          { x: 800, y: 95 }, { x: 800, y: 745 }, { x: 465, y: 420 }, { x: 1135, y: 420 }
+        ],
+        treasureSpots: [
+          [110, 160], [510, 120], [1490, 160], [1090, 120],
+          [660, 420], [940, 420], [110, 690], [1490, 690]
+        ]
+      }
+    ];
+
+    const clientId = sessionStorage.getItem('fm_client_id') || ('p_' + Math.random().toString(36).substring(2, 9));
+    sessionStorage.setItem('fm_client_id', clientId);
+
+    const defaultName = isTouchDevice ? 'Caçador ' + Math.floor(10 + Math.random() * 89) : 'Papai (Notebook)';
+    let myName = localStorage.getItem('fm_player_name') || defaultName;
+    let myRole = localStorage.getItem('fm_player_role') || (isTouchDevice ? 'hunter' : 'ghost');
+
+    const inputState = {
+      dx: 0, dy: 0, angle: 0,
+      turbo: false,
+      hunterStun: false,
+      ghostSkill1: false,
+      ghostSkill2: false,
+      ghostSkill3: false,
+      ghostSkill4: false
+    };
+
+    const keys = {};
+    let pendingCommands = [];
+    let gameState = null;
+    let renderPlayers = {};
+    let lastToastText = '';
+    let audioEnabled = true;
+    let audioCtx = null;
+    let lastHeartbeatAt = 0;
+
+    // P2P WebRTC
+    let netMode = 'local_host';
+    let peer = null;
+    let hostConn = null;
+    let clientConns = {};
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('player-name').value = myName;
+      updateRoleButtonsUI();
+      setupKeyboardAndMouse();
+      setupTouchJoysticks();
+      pendingCommands.push({ action: 'init_default_bots' });
+      startGameLoop();
+      requestAnimationFrame(renderLoop);
+      tryAutoJoinFromUrl();
+    });
+
+    // ========================================================================
+    // ATALHOS DE TECLADO NO PC + MOUSE
+    // ========================================================================
+    function setupKeyboardAndMouse() {
+      window.addEventListener('keydown', (e) => {
+        if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+        const k = e.key.toLowerCase();
+        keys[k] = true;
+
+        if (k === '1' || k === ' ') {
+          inputState.ghostSkill1 = true;
+          inputState.turbo = true;
+          if (k === ' ') e.preventDefault();
+        }
+        if (k === '2' || k === 'q') {
+          inputState.ghostSkill2 = true;
+          inputState.hunterStun = true;
+        }
+        if (k === '3' || k === 'e') {
+          inputState.ghostSkill3 = true;
+          inputState.hunterStun = true;
+        }
+        if (k === '4' || k === 'r') inputState.ghostSkill4 = true;
+      });
+
+      window.addEventListener('keyup', (e) => {
+        const k = e.key.toLowerCase();
+        keys[k] = false;
+        if (k === '1' || k === ' ') inputState.turbo = false;
+      });
+
+      const canvas = document.getElementById('game-canvas');
+      canvas.addEventListener('mousemove', (e) => {
+        if (!gameState || !gameState.players) return;
+        const me = gameState.players.find(p => p.id === clientId);
+        if (!me) return;
+        // Converte posição do mouse para o canvas (considerando object-contain / tarjas)
+        const rect = canvas.getBoundingClientRect();
+        const s = Math.min(rect.width / canvas.width, rect.height / canvas.height);
+        const offX = (rect.width - canvas.width * s) / 2;
+        const offY = (rect.height - canvas.height * s) / 2;
+        const mx = (e.clientX - rect.left - offX) / s;
+        const my = (e.clientY - rect.top - offY) / s;
+        // Posição do jogador na tela, considerando o zoom da câmera do Caçador
+        const rp = renderPlayers[me.id] || me;
+        const sx = (rp.x - camera.x) * camera.zoom + canvas.width / 2;
+        const sy = (rp.y - camera.y) * camera.zoom + canvas.height / 2;
+        inputState.angle = Math.atan2(my - sy, mx - sx);
+      });
+
+      canvas.addEventListener('mousedown', (e) => {
+        ensureAudio();
+        if (e.button === 0 || e.button === 2) inputState.turbo = true;
+      });
+      window.addEventListener('mouseup', () => { inputState.turbo = false; });
+      canvas.addEventListener('contextmenu', e => e.preventDefault());
+    }
+
+    window.triggerGhostSkill = function(num) {
+      ensureAudio();
+      if (num === 1) inputState.ghostSkill1 = true;
+      if (num === 2) inputState.ghostSkill2 = true;
+      if (num === 3) inputState.ghostSkill3 = true;
+      if (num === 4) inputState.ghostSkill4 = true;
+    };
+
+    window.triggerHunterStun = function() {
+      ensureAudio();
+      inputState.hunterStun = true;
+    };
+
+    window.setTurboActive = function(active) {
+      ensureAudio();
+      inputState.turbo = active;
+      if (active) inputState.ghostSkill1 = true;
+    };
+
+    // ========================================================================
+    // JOYSTICKS TOUCH (CELULARES)
+    // ========================================================================
+    let stickLeftTouchId = null;
+    let stickRightTouchId = null;
+    let stickLeftVec = { x: 0, y: 0 };
+
+    function setupTouchJoysticks() {
+      const leftZone = document.getElementById('stick-left-zone');
+      const leftKnob = document.getElementById('stick-left-knob');
+      const rightZone = document.getElementById('stick-right-zone');
+      const rightKnob = document.getElementById('stick-right-knob');
+
+      function handleStick(zone, knob, clientX, clientY, isRight) {
+        const rect = zone.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const maxDist = rect.width * 0.38;
+        let dx = clientX - cx;
+        let dy = clientY - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > maxDist) { dx = (dx / dist) * maxDist; dy = (dy / dist) * maxDist; }
+        knob.style.transform = `translate(${dx}px, ${dy}px)`;
+        if (isRight) {
+          if (dist > 6) inputState.angle = Math.atan2(dy, dx);
+        } else {
+          stickLeftVec.x = dx / maxDist;
+          stickLeftVec.y = dy / maxDist;
+          if (stickRightTouchId === null && Math.hypot(stickLeftVec.x, stickLeftVec.y) > 0.25) {
+            inputState.angle = Math.atan2(stickLeftVec.y, stickLeftVec.x);
+          }
+        }
+      }
+
+      leftZone.addEventListener('pointerdown', (e) => {
+        ensureAudio(); tryAutoFullscreen();
+        stickLeftTouchId = e.pointerId; leftZone.setPointerCapture(e.pointerId);
+        handleStick(leftZone, leftKnob, e.clientX, e.clientY, false);
+      });
+      leftZone.addEventListener('pointermove', (e) => {
+        if (e.pointerId === stickLeftTouchId) handleStick(leftZone, leftKnob, e.clientX, e.clientY, false);
+      });
+      const resetL = (e) => {
+        if (e.pointerId === stickLeftTouchId) {
+          stickLeftTouchId = null; stickLeftVec.x = 0; stickLeftVec.y = 0;
+          leftKnob.style.transform = 'translate(0px, 0px)';
+        }
+      };
+      leftZone.addEventListener('pointerup', resetL);
+      leftZone.addEventListener('pointercancel', resetL);
+
+      rightZone.addEventListener('pointerdown', (e) => {
+        ensureAudio(); tryAutoFullscreen();
+        stickRightTouchId = e.pointerId; rightZone.setPointerCapture(e.pointerId);
+        handleStick(rightZone, rightKnob, e.clientX, e.clientY, true);
+      });
+      rightZone.addEventListener('pointermove', (e) => {
+        if (e.pointerId === stickRightTouchId) handleStick(rightZone, rightKnob, e.clientX, e.clientY, true);
+      });
+      const resetR = (e) => {
+        if (e.pointerId === stickRightTouchId) {
+          stickRightTouchId = null;
+          rightKnob.style.transform = 'translate(0px, 0px)';
+        }
+      };
+      rightZone.addEventListener('pointerup', resetR);
+      rightZone.addEventListener('pointercancel', resetR);
+    }
+
+    function computeMovementVector() {
+      let kx = 0, ky = 0;
+      if (keys['w'] || keys['arrowup']) ky -= 1;
+      if (keys['s'] || keys['arrowdown']) ky += 1;
+      if (keys['a'] || keys['arrowleft']) kx -= 1;
+      if (keys['d'] || keys['arrowright']) kx += 1;
+      if (kx !== 0 || ky !== 0) {
+        const len = Math.hypot(kx, ky);
+        inputState.dx = kx / len; inputState.dy = ky / len;
+      } else {
+        inputState.dx = stickLeftVec.x; inputState.dy = stickLeftVec.y;
+      }
+    }
+
+    // ========================================================================
+    // WEBRTC P2P (PEERJS)
+    // ========================================================================
+    window.createP2PRoom = function() {
+      tryAutoFullscreen();
+      if (typeof Peer === 'undefined') {
+        setP2PMsg('⚠️ Sem internet para sala online. Jogando no Modo Local!', 'text-amber-400');
+        return;
+      }
+      const code = String(Math.floor(1000 + Math.random() * 9000));
+      const peerId = 'fantasma-mansao-room-' + code;
+      setP2PMsg('Criando sala ' + code + '...', 'text-zinc-300');
+
+      if (peer) peer.destroy();
+      peer = new Peer(peerId);
+
+      peer.on('open', () => {
+        netMode = 'p2p_host';
+        document.getElementById('btn-create-room').classList.add('hidden');
+        document.getElementById('room-code-display').classList.remove('hidden');
+        document.getElementById('room-code-number').textContent = code;
+        document.getElementById('p2p-badge').textContent = 'Host • Sala ' + code;
+        document.getElementById('p2p-badge').className = 'text-[11px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40';
+        setP2PMsg('✅ Sala aberta! Digite o código ' + code + ' nos celulares.', 'text-emerald-400');
+        // Se o jogo estiver publicado na internet (http/https), gera link + QR Code de entrada direta
+        if (location.protocol.startsWith('http')) {
+          const link = location.origin + location.pathname + '?sala=' + code;
+          document.getElementById('share-link').value = link;
+          document.getElementById('share-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(link);
+          document.getElementById('share-box').classList.remove('hidden');
+        }
+      });
+
+      peer.on('connection', (conn) => {
+        conn.on('data', (data) => {
+          if (data && data.id) {
+            clientConns[data.id] = conn;
+            applyPlayerPayloadToEngine(data);
+          }
+        });
+        conn.on('close', () => {
+          for (const k of Object.keys(clientConns)) {
+            if (clientConns[k] === conn) {
+              delete clientConns[k];
+              delete hostEngine.players[k];
+            }
+          }
+        });
+      });
+
+      peer.on('error', (err) => {
+        setP2PMsg('Erro ao criar sala P2P: ' + err.type, 'text-red-400');
+      });
+    };
+
+    window.joinP2PRoom = function() {
+      forceFullscreenNow();
+      const code = (document.getElementById('join-code-input').value || '').trim();
+      if (code.length !== 4) {
+        setP2PMsg('Digite os 4 números do código da sala!', 'text-amber-400');
+        return;
+      }
+      if (typeof Peer === 'undefined') return;
+      setP2PMsg('Conectando à sala ' + code + '...', 'text-zinc-300');
+      if (peer) peer.destroy();
+      peer = new Peer();
+
+      peer.on('open', () => {
+        hostConn = peer.connect('fantasma-mansao-room-' + code, { reliable: false });
+        hostConn.on('open', () => {
+          netMode = 'p2p_client';
+          document.getElementById('p2p-badge').textContent = 'Conectado • Sala ' + code;
+          document.getElementById('p2p-badge').className = 'text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+          setP2PMsg('✅ Conectado em Tela Cheia à sala ' + code + '!', 'text-emerald-400');
+        });
+        hostConn.on('data', (state) => {
+          if (state && state.status) onServerStateUpdate(state);
+        });
+      });
+    };
+
+    function setP2PMsg(txt, cls) {
+      const el = document.getElementById('p2p-msg');
+      if (el) { el.textContent = txt; el.className = 'text-[11px] text-center min-h-[14px] ' + cls; }
+    }
+
+    window.copyShareLink = function() {
+      const inp = document.getElementById('share-link');
+      if (!inp) return;
+      inp.select();
+      (navigator.clipboard ? navigator.clipboard.writeText(inp.value) : Promise.reject())
+        .then(() => setP2PMsg('📋 Link copiado! Mande no WhatsApp para os celulares.', 'text-emerald-400'))
+        .catch(() => { document.execCommand('copy'); setP2PMsg('📋 Link copiado!', 'text-emerald-400'); });
+    };
+
+    // Entrada automática quando o celular abre o link "...?sala=1234"
+    function tryAutoJoinFromUrl() {
+      const sala = new URLSearchParams(location.search).get('sala');
+      if (!sala || !/^\d{4}$/.test(sala)) return;
+      document.getElementById('join-code-input').value = sala;
+      if (myRole !== 'hunter') selectRole('hunter');
+      setP2PMsg('🔗 Link da sala ' + sala + ' detectado. Conectando...', 'text-amber-300');
+      const attempt = (n) => {
+        if (typeof Peer !== 'undefined') joinP2PRoom();
+        else if (n > 0) setTimeout(() => attempt(n - 1), 500);
+      };
+      setTimeout(() => attempt(10), 400);
+    }
+
+    // ========================================================================
+    // EFEITOS SONOROS (WEB AUDIO API)
+    // ========================================================================
+    function ensureAudio() {
+      if (!audioEnabled) return null;
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) audioCtx = new AC();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      return audioCtx;
+    }
+
+    function playSound(type) {
+      const ctx = ensureAudio();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      if (type === 'relic') {
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+          gain.gain.setValueAtTime(0.14, now + idx * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.25);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now + idx * 0.06); osc.stop(now + idx * 0.06 + 0.26);
+        });
+      } else if (type === 'freeze') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(75, now + 0.45);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.46);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now); osc.stop(now + 0.47);
+      } else if (type === 'rescue') {
+        [440, 554.37, 659.25].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+          gain.gain.setValueAtTime(0.15, now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.22);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now + idx * 0.08); osc.stop(now + idx * 0.08 + 0.23);
+        });
+      } else if (type === 'blackout') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(130, now);
+        osc.frequency.linearRampToValueAtTime(42, now + 0.6);
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.62);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now); osc.stop(now + 0.65);
+      } else if (type === 'teleport') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(680, now + 0.22);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now); osc.stop(now + 0.25);
+      } else if (type === 'stun') {
+        [580, 420, 740].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+          gain.gain.setValueAtTime(0.16, now + idx * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.18);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now + idx * 0.06); osc.stop(now + idx * 0.06 + 0.19);
+        });
+      } else if (type === 'heartbeat') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(65, now);
+        osc.frequency.exponentialRampToValueAtTime(38, now + 0.14);
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now); osc.stop(now + 0.16);
+      }
+    }
+
+    window.toggleAudio = function() {
+      audioEnabled = !audioEnabled;
+      document.getElementById('btn-sound').textContent = audioEnabled ? '🔊 Som: Ligado' : '🔇 Som: Mudo';
+    };
+
+    window.updateMyProfile = function() {
+      const input = document.getElementById('player-name');
+      if (input && input.value.trim()) {
+        myName = input.value.trim().substring(0, 14);
+        localStorage.setItem('fm_player_name', myName);
+      }
+    };
+
+    window.selectRole = function(role) {
+      ensureAudio();
+      tryAutoFullscreen();
+      myRole = role;
+      localStorage.setItem('fm_player_role', myRole);
+      updateRoleButtonsUI();
+      pendingCommands.push({ action: 'set_role', role: myRole });
+    };
+
+    function updateRoleButtonsUI() {
+      const btnH = document.getElementById('role-hunter-btn');
+      const btnG = document.getElementById('role-ghost-btn');
+      if (myRole === 'hunter') {
+        btnH.className = 'flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold border transition flex items-center justify-center gap-1.5 bg-amber-500/20 border-amber-400 text-amber-300';
+        btnG.className = 'flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold border transition flex items-center justify-center gap-1.5 bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white';
+      } else {
+        btnG.className = 'flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold border transition flex items-center justify-center gap-1.5 bg-purple-500/25 border-purple-400 text-purple-200';
+        btnH.className = 'flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold border transition flex items-center justify-center gap-1.5 bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white';
+      }
+    }
+
+    window.sendLobbyCommand = function(action) {
+      ensureAudio();
+      pendingCommands.push({ action });
+    };
+
+    // ========================================================================
+    // MOTOR DO JOGO COM 3 FASES RANDOMIZADAS & PONTUAÇÃO POR TESOURO
+    // ========================================================================
+    let lastStageIndex = -1;
+
+    const hostEngine = {
+      status: 'lobby',
+      stageIndex: 0,
+      stageName: STAGES[0].name,
+      winner: '',
+      winReason: '',
+      toast: '',
+      toastTimer: 0,
+      timeLeft: 180,
+      blackoutTimer: 0,
+      botStunCooldown: 0,
+      relicsCollected: 0,
+      relicsTarget: 8,
+      players: {},
+      clones: [],
+      walls: STAGES[0].walls,
+      stations: STAGES[0].stations,
+      relics: []
+    };
+
+    const palette = ['#fbbf24', '#38bdf8', '#34d399', '#f472b6', '#a78bfa'];
+
+    function applyPlayerPayloadToEngine(payload) {
+      let p = hostEngine.players[payload.id];
+      if (!p) {
+        p = {
+          id: payload.id,
+          name: payload.name || 'Jogador',
+          role: payload.role || 'hunter',
+          color: palette[Object.keys(hostEngine.players).length % palette.length],
+          x: 800, y: 740, dx: 0, dy: 0, angle: 0,
+          battery: 100, turbo: false, frozen: false, rescueProgress: 0,
+          lit: false, moving: false,
+          stunCharges: 1, stunTimer: 0, stunnedBy: '',
+          phaseTimer: 0, phaseCooldown: 0,
+          blackoutCooldown: 0, cloneCooldown: 0, dashCooldown: 0,
+          score: 0, treasuresFound: 0,
+          isBot: false
+        };
+        hostEngine.players[payload.id] = p;
+      }
+      p.name = payload.name || p.name;
+      p.dx = payload.dx || 0;
+      p.dy = payload.dy || 0;
+      p.angle = payload.angle || 0;
+      p.turboReq = !!payload.turbo;
+      if (payload.hunterStun) p.hunterStun = true;
+      if (payload.ghostSkill1) p.ghostSkill1 = true;
+      if (payload.ghostSkill2) p.ghostSkill2 = true;
+      if (payload.ghostSkill3) p.ghostSkill3 = true;
+      if (payload.ghostSkill4) p.ghostSkill4 = true;
+
+      for (const cmd of (payload.commands || [])) {
+        if (cmd.action === 'set_role' && hostEngine.status === 'lobby') {
+          p.role = cmd.role || payload.role;
+        } else if (cmd.action === 'init_default_bots') {
+          if (Object.keys(hostEngine.players).length <= 1) {
+            const botNames = ['Pedrão', 'Queijo', 'Bibidi'];
+            for (let i = 1; i <= 3; i++) {
+              const bid = 'bot_init_' + i;
+              hostEngine.players[bid] = {
+                id: bid, name: botNames[i - 1], role: 'hunter',
+                color: palette[i % palette.length],
+                x: 720 + i * 45, y: 740, dx: 0, dy: 0, angle: 0,
+                battery: 100, turbo: false, frozen: false, rescueProgress: 0,
+                lit: false, moving: false,
+                stunCharges: 1, stunTimer: 0, stunnedBy: '',
+                phaseTimer: 0, phaseCooldown: 0,
+                blackoutCooldown: 0, cloneCooldown: 0, dashCooldown: 0,
+                score: 0, treasuresFound: 0, isBot: true
+              };
+            }
+          }
+        } else if (cmd.action === 'add_bot') {
+          const list = Object.values(hostEngine.players);
+          if (list.length < 6) {
+            const hasGhost = list.some(x => x.role === 'ghost');
+            const bRole = !hasGhost ? 'ghost' : 'hunter';
+            const bid = 'bot_' + Math.floor(1000 + Math.random() * 8999);
+            hostEngine.players[bid] = {
+              id: bid,
+              name: bRole === 'ghost' ? 'Fantasma IA' : 'Caçador IA ' + list.length,
+              role: bRole,
+              color: bRole === 'ghost' ? '#c084fc' : palette[list.length % palette.length],
+              x: 800, y: 740, dx: 0, dy: 0, angle: 0,
+              battery: 100, turbo: false, frozen: false, rescueProgress: 0,
+              lit: false, moving: false,
+              stunCharges: 1, stunTimer: 0, stunnedBy: '',
+              phaseTimer: 0, phaseCooldown: 0,
+              blackoutCooldown: 0, cloneCooldown: 0, dashCooldown: 0,
+              score: 0, treasuresFound: 0, isBot: true
+            };
+          }
+        } else if (cmd.action === 'clear_bots') {
+          for (const k of Object.keys(hostEngine.players)) {
+            if (hostEngine.players[k].isBot) delete hostEngine.players[k];
+          }
+        } else if (cmd.action === 'start_game') {
+          startHostMatch();
+        } else if (cmd.action === 'back_to_lobby') {
+          hostEngine.status = 'lobby';
+        }
+      }
+    }
+
+    function pickRandomStageIndex() {
+      const options = [0, 1, 2].filter(idx => idx !== lastStageIndex);
+      const chosen = options[Math.floor(Math.random() * options.length)];
+      lastStageIndex = chosen;
+      return chosen;
+    }
+
+    function startHostMatch() {
+      const stIdx = pickRandomStageIndex();
+      const stage = STAGES[stIdx];
+      hostEngine.stageIndex = stIdx;
+      hostEngine.stageName = stage.name;
+      hostEngine.walls = stage.walls;
+      hostEngine.stations = stage.stations;
+
+      if (!Object.values(hostEngine.players).some(p => p.role === 'ghost')) {
+        hostEngine.players['bot_ghost'] = {
+          id: 'bot_ghost', name: 'Fantasma IA', role: 'ghost', color: '#c084fc',
+          x: 800, y: 90, dx: 0, dy: 0, angle: 0, battery: 100,
+          stunCharges: 0, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
+        };
+      }
+      if (!Object.values(hostEngine.players).some(p => p.role === 'hunter')) {
+        hostEngine.players['bot_h1'] = {
+          id: 'bot_h1', name: 'Caçador IA 1', role: 'hunter', color: '#fbbf24',
+          x: 760, y: 740, dx: 0, dy: 0, angle: 0, battery: 100,
+          stunCharges: 1, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
+        };
+      }
+
+      let hIdx = 0;
+      const spawns = [[720, 740], [800, 740], [880, 740], [800, 690]];
+      for (const p of Object.values(hostEngine.players)) {
+        p.frozen = false; p.rescueProgress = 0; p.battery = 100; p.lit = false;
+        p.stunCharges = p.role === 'hunter' ? 1 : 0;
+        p.stunTimer = 0; p.stunnedBy = ''; p.hunterStun = false;
+        p.phaseTimer = 0; p.phaseCooldown = 0;
+        p.blackoutCooldown = 0; p.cloneCooldown = 0; p.dashCooldown = 0;
+        p.treasuresFound = 0;
+        if (typeof p.score !== 'number') p.score = 0;
+        if (p.role === 'ghost') { p.x = 800; p.y = 85; }
+        else { p.x = spawns[hIdx % 4][0]; p.y = spawns[hIdx % 4][1]; hIdx++; }
+      }
+
+      hostEngine.relics = stage.treasureSpots.map((s, i) => ({
+        id: i + 1, x: s[0], y: s[1], collected: false
+      }));
+      hostEngine.relicsCollected = 0;
+      hostEngine.relicsTarget = hostEngine.relics.length;
+      hostEngine.clones = [];
+      hostEngine.timeLeft = 180;
+      hostEngine.blackoutTimer = 0;
+      hostEngine.botStunCooldown = 6.0;
+      hostEngine.status = 'playing';
+      hostEngine.toast = `🎲 ${stage.name}! Cada Caçador tem 1 trava de 3s (⛓️) contra o Fantasma!`;
+      hostEngine.toastTimer = 3.8;
+    }
+
+    function moveHostPlayer(p, vx, vy, ignoreInner) {
+      const r = 16;
+      const collide = (cx, cy) => hostEngine.walls.some(w => {
+        if (ignoreInner && !w.border) return false;
+        const kx = Math.max(w.x, Math.min(cx, w.x + w.w));
+        const ky = Math.max(w.y, Math.min(cy, w.y + w.h));
+        return Math.hypot(cx - kx, cy - ky) < r;
+      });
+      if (!collide(p.x + vx, p.y)) p.x = Math.max(28, Math.min(MAP_W - 28, p.x + vx));
+      if (!collide(p.x, p.y + vy)) p.y = Math.max(28, Math.min(MAP_H - 28, p.y + vy));
+    }
+
+    function stepHostSimulation(dt) {
+      if (hostEngine.toastTimer > 0) {
+        hostEngine.toastTimer -= dt;
+        if (hostEngine.toastTimer <= 0) hostEngine.toast = '';
+      }
+      if (hostEngine.status !== 'playing') return;
+
+      hostEngine.timeLeft -= dt;
+      if (hostEngine.blackoutTimer > 0) hostEngine.blackoutTimer -= dt;
+      if (hostEngine.botStunCooldown > 0) hostEngine.botStunCooldown -= dt;
+
+      const pList = Object.values(hostEngine.players);
+      const ghost = pList.find(x => x.role === 'ghost');
+      if (ghost) ghost.lit = false;
+
+      // Clones Assustadores (Apenas rodeiam e assustam a ~82px de distância, NUNCA sobrepõem jogadores!)
+      const SCARE_ORBIT_DIST = 82;
+      const MIN_PLAYER_SEP = 68;
+      for (let i = hostEngine.clones.length - 1; i >= 0; i--) {
+        const cl = hostEngine.clones[i];
+        cl.timer -= dt;
+        if (cl.timer <= 0) { hostEngine.clones.splice(i, 1); continue; }
+        cl.orbitAngle = (cl.orbitAngle || 0) + dt * 3.8;
+
+        const targets = pList.filter(h => h.role === 'hunter' && !h.frozen);
+        targets.sort((a, b) => Math.hypot(a.x - cl.x, a.y - cl.y) - Math.hypot(b.x - cl.x, b.y - cl.y));
+        const tgt = targets[0];
+        if (tgt) {
+          const distToHunter = Math.hypot(tgt.x - cl.x, tgt.y - cl.y);
+          // Posição alvo fica numa órbita ao redor do Caçador (a 82px de distância) para nunca ficar em cima dele
+          const desiredX = tgt.x + Math.cos(cl.orbitAngle) * SCARE_ORBIT_DIST;
+          const desiredY = tgt.y + Math.sin(cl.orbitAngle) * SCARE_ORBIT_DIST;
+          const dx = desiredX - cl.x;
+          const dy = desiredY - cl.y;
+          const dLen = Math.max(1, Math.hypot(dx, dy));
+          const step = Math.min(dLen, 215 * dt);
+          cl.x += (dx / dLen) * step;
+          cl.y += (dy / dLen) * step;
+          cl.scaring = distToHunter < 125;
+        } else {
+          cl.scaring = false;
+        }
+
+        // Barreira anti-sobreposição: garante que o Clone NUNCA fique em cima de nenhum jogador
+        for (const pl of pList) {
+          const pdx = cl.x - pl.x;
+          const pdy = cl.y - pl.y;
+          const pDist = Math.hypot(pdx, pdy);
+          if (pDist < MIN_PLAYER_SEP) {
+            const pushAng = pDist > 0.1 ? Math.atan2(pdy, pdx) : (cl.orbitAngle || 0);
+            cl.x = pl.x + Math.cos(pushAng) * MIN_PLAYER_SEP;
+            cl.y = pl.y + Math.sin(pushAng) * MIN_PLAYER_SEP;
+          }
+        }
+        cl.x = Math.max(32, Math.min(MAP_W - 32, cl.x));
+        cl.y = Math.max(32, Math.min(MAP_H - 32, cl.y));
+      }
+
+      // IA dos Bots
+      for (const bp of pList) {
+        if (!bp.isBot) continue;
+        if (bp.role === 'ghost') {
+          const targets = pList.filter(h => h.role === 'hunter' && !h.frozen);
+          targets.sort((a, b) => Math.hypot(a.x - bp.x, a.y - bp.y) - Math.hypot(b.x - bp.x, b.y - bp.y));
+          if (targets[0]) {
+            const dist = Math.max(1, Math.hypot(targets[0].x - bp.x, targets[0].y - bp.y));
+            bp.dx = (targets[0].x - bp.x) / dist;
+            bp.dy = (targets[0].y - bp.y) / dist;
+            bp.angle = Math.atan2(bp.dy, bp.dx);
+            if (dist < 260 && bp.phaseCooldown <= 0) bp.ghostSkill1 = true;
+          }
+        } else {
+          if (bp.frozen) { bp.dx = 0; bp.dy = 0; continue; }
+          const frozenAlly = pList.find(h => h.role === 'hunter' && h.frozen && h.id !== bp.id);
+          let tx = 800, ty = 420;
+          if (frozenAlly) { tx = frozenAlly.x; ty = frozenAlly.y; }
+          else {
+            const avail = hostEngine.relics.filter(r => !r.collected);
+            avail.sort((a, b) => Math.hypot(a.x - bp.x, a.y - bp.y) - Math.hypot(b.x - bp.x, b.y - bp.y));
+            if (avail[0]) { tx = avail[0].x; ty = avail[0].y; }
+          }
+          const dist = Math.max(1, Math.hypot(tx - bp.x, ty - bp.y));
+          bp.dx = (tx - bp.x) / dist;
+          bp.dy = (ty - bp.y) / dist;
+          if (ghost && Math.hypot(ghost.x - bp.x, ghost.y - bp.y) < 250) {
+            const gDist = Math.hypot(ghost.x - bp.x, ghost.y - bp.y);
+            bp.angle = Math.atan2(ghost.y - bp.y, ghost.x - bp.x);
+            bp.turboReq = gDist < 175 && bp.battery > 30;
+            // Bot Caçador usa sua trava de 3s se o Fantasma chegar muito perto
+            if (gDist < 130 && (bp.stunCharges || 0) > 0 && (ghost.stunTimer || 0) <= 0 && hostEngine.botStunCooldown <= 0) {
+              bp.hunterStun = true;
+            }
+          } else {
+            bp.angle = Math.atan2(bp.dy, bp.dx);
+            bp.turboReq = false;
+          }
+        }
+      }
+
+      // Poder de Travar o Fantasma por 3 Segundos (1 uso por cada Caçador)
+      for (const h of pList.filter(x => x.role === 'hunter')) {
+        if (h.hunterStun) {
+          h.hunterStun = false;
+          if (!h.frozen && (h.stunCharges || 0) > 0 && ghost && (ghost.stunTimer || 0) <= 0) {
+            h.stunCharges = 0;
+            ghost.stunTimer = 3.0;
+            ghost.stunnedBy = h.name;
+            hostEngine.botStunCooldown = 8.5;
+            hostEngine.toast = `⛓️ ${h.name} TRAVOU o Fantasma por 3 segundos!`;
+            hostEngine.toastTimer = 3.0;
+          }
+        }
+      }
+
+      // Lanternas e Resgates
+      for (const h of pList.filter(x => x.role === 'hunter')) {
+        if (h.frozen) { h.turbo = false; continue; }
+        h.turbo = h.turboReq && h.battery > 5;
+        h.battery = h.turbo ? Math.max(0, h.battery - 20 * dt) : Math.min(100, h.battery + 5.5 * dt);
+        for (const st of hostEngine.stations) {
+          if (Math.hypot(st.x - h.x, st.y - h.y) < 46) h.battery = Math.min(100, h.battery + 35 * dt);
+        }
+        if (h.battery <= 0) continue;
+        const range = hostEngine.blackoutTimer > 0 ? 150 : (h.turbo ? 350 : 275);
+        const spread = h.turbo ? 0.56 : 0.43;
+        if (ghost) {
+          const dist = Math.hypot(ghost.x - h.x, ghost.y - h.y);
+          const ang = Math.atan2(ghost.y - h.y, ghost.x - h.x);
+          const diff = Math.abs(Math.atan2(Math.sin(ang - h.angle), Math.cos(ang - h.angle)));
+          if (dist <= range && diff <= spread) ghost.lit = true;
+        }
+        for (const ally of pList.filter(a => a.role === 'hunter' && a.frozen && a.id !== h.id)) {
+          const dist = Math.hypot(ally.x - h.x, ally.y - h.y);
+          const ang = Math.atan2(ally.y - h.y, ally.x - h.x);
+          const diff = Math.abs(Math.atan2(Math.sin(ang - h.angle), Math.cos(ang - h.angle)));
+          if (dist < 58 || (dist < 230 && diff <= spread)) {
+            ally.rescueProgress += 65 * dt;
+            if (ally.rescueProgress >= 100) {
+              ally.frozen = false;
+              ally.rescueProgress = 0;
+              h.score = (h.score || 0) + 150;
+              hostEngine.toast = `🔦 ${h.name} salvou ${ally.name}! (+150 pts)`;
+              hostEngine.toastTimer = 3.0;
+            }
+          }
+        }
+      }
+
+      // Movimento, Tesouros e Poderes
+      for (const pl of pList) {
+        if (pl.role === 'ghost') {
+          if (pl.stunTimer > 0) {
+            pl.stunTimer = Math.max(0, pl.stunTimer - dt);
+            if (pl.stunTimer <= 0) pl.stunnedBy = '';
+          }
+          if (pl.phaseCooldown > 0) pl.phaseCooldown = Math.max(0, pl.phaseCooldown - dt);
+          if (pl.phaseTimer > 0) pl.phaseTimer = Math.max(0, pl.phaseTimer - dt);
+          if (pl.blackoutCooldown > 0) pl.blackoutCooldown = Math.max(0, pl.blackoutCooldown - dt);
+          if (pl.cloneCooldown > 0) pl.cloneCooldown = Math.max(0, pl.cloneCooldown - dt);
+          if (pl.dashCooldown > 0) pl.dashCooldown = Math.max(0, pl.dashCooldown - dt);
+
+          const isStunned = (pl.stunTimer || 0) > 0;
+
+          if (!isStunned && pl.ghostSkill1 && pl.phaseCooldown <= 0 && pl.phaseTimer <= 0) {
+            pl.phaseTimer = 3.5; pl.phaseCooldown = 8.0;
+            hostEngine.toast = '🌀 Forma Astral! O Fantasma atravessa paredes!';
+            hostEngine.toastTimer = 2.8;
+          }
+          if (pl.ghostSkill2 && pl.blackoutCooldown <= 0) {
+            hostEngine.blackoutTimer = 4.5; pl.blackoutCooldown = 14.0;
+            hostEngine.toast = '🌑 Apagão Assombrado! As luzes fraquejaram!';
+            hostEngine.toastTimer = 2.8;
+          }
+          if (pl.ghostSkill3 && pl.cloneCooldown <= 0) {
+            pl.cloneCooldown = 10.0;
+            const spawnAng = Math.hypot(pl.dx, pl.dy) > 0.1 ? Math.atan2(pl.dy, pl.dx) : (pl.angle || 0);
+            hostEngine.clones.push({
+              x: Math.max(40, Math.min(MAP_W - 40, pl.x + Math.cos(spawnAng) * 72)),
+              y: Math.max(40, Math.min(MAP_H - 40, pl.y + Math.sin(spawnAng) * 72)),
+              orbitAngle: spawnAng,
+              scaring: false,
+              timer: 6.0
+            });
+            hostEngine.toast = '👥 O Fantasma invocou um Clone Assustador!';
+            hostEngine.toastTimer = 2.8;
+          }
+          if (!isStunned && pl.ghostSkill4 && pl.dashCooldown <= 0) {
+            pl.dashCooldown = 11.0;
+            const dashAng = Math.hypot(pl.dx, pl.dy) > 0.1 ? Math.atan2(pl.dy, pl.dx) : pl.angle;
+            pl.x = Math.max(35, Math.min(MAP_W - 35, pl.x + Math.cos(dashAng) * 230));
+            pl.y = Math.max(35, Math.min(MAP_H - 35, pl.y + Math.sin(dashAng) * 230));
+            hostEngine.toast = '⚡ Salto Sombrio! O Fantasma teleportou!';
+            hostEngine.toastTimer = 2.5;
+          }
+
+          pl.ghostSkill1 = false; pl.ghostSkill2 = false; pl.ghostSkill3 = false; pl.ghostSkill4 = false;
+
+          if (isStunned) {
+            pl.moving = false;
+          } else {
+            const baseSpeed = pl.phaseTimer > 0 ? 250 : 220;
+            const speed = pl.lit ? 120 : baseSpeed;
+            const len = Math.hypot(pl.dx, pl.dy);
+            pl.moving = len > 0.1;
+            moveHostPlayer(pl, len > 0.01 ? (pl.dx / Math.max(1, len)) * speed * dt : 0, len > 0.01 ? (pl.dy / Math.max(1, len)) * speed * dt : 0, pl.phaseTimer > 0);
+          }
+        } else {
+          if (pl.frozen) { pl.moving = false; continue; }
+          const speed = pl.turbo ? 172 : 198;
+          const len = Math.hypot(pl.dx, pl.dy);
+          pl.moving = len > 0.15;
+          moveHostPlayer(pl, len > 0.01 ? (pl.dx / Math.max(1, len)) * speed * dt : 0, len > 0.01 ? (pl.dy / Math.max(1, len)) * speed * dt : 0, false);
+
+          for (const rel of hostEngine.relics) {
+            if (!rel.collected && Math.hypot(rel.x - pl.x, rel.y - pl.y) < 30) {
+              rel.collected = true;
+              hostEngine.relicsCollected++;
+              pl.treasuresFound = (pl.treasuresFound || 0) + 1;
+              pl.score = (pl.score || 0) + 100;
+              const faltam = hostEngine.relicsTarget - hostEngine.relicsCollected;
+              hostEngine.toast = faltam > 0
+                ? `💎 ${pl.name} recolheu um Tesouro! (+100 pts • Faltam ${faltam})`
+                : `🏆 TODOS os Tesouros foram recolhidos!`;
+              hostEngine.toastTimer = 3.0;
+            }
+          }
+          // O Fantasma só congela Caçadores se NÃO estiver travado pelos 3 segundos
+          if (ghost && (ghost.stunTimer || 0) <= 0 && Math.hypot(ghost.x - pl.x, ghost.y - pl.y) < 30) {
+            pl.frozen = true;
+            pl.rescueProgress = 0;
+            ghost.score = (ghost.score || 0) + 150;
+            hostEngine.toast = `🧊 O Fantasma congelou ${pl.name}! (+150 pts para o Fantasma)`;
+            hostEngine.toastTimer = 3.0;
+          }
+        }
+      }
+
+      if (hostEngine.relicsCollected >= hostEngine.relicsTarget) {
+        hostEngine.status = 'gameover';
+        hostEngine.winner = 'hunters';
+        for (const h of pList.filter(x => x.role === 'hunter')) {
+          h.score = (h.score || 0) + 250;
+        }
+      } else {
+        const hunters = pList.filter(x => x.role === 'hunter');
+        if (hunters.length > 0 && hunters.every(h => h.frozen)) {
+          hostEngine.status = 'gameover';
+          hostEngine.winner = 'ghost';
+          hostEngine.winReason = 'Todos os Caçadores foram congelados pelo Fantasma!';
+          if (ghost) ghost.score = (ghost.score || 0) + 300;
+        } else if (hostEngine.timeLeft <= 0) {
+          hostEngine.status = 'gameover';
+          hostEngine.winner = 'ghost';
+          hostEngine.winReason = 'O tempo acabou antes de recolherem todos os tesouros!';
+          if (ghost) ghost.score = (ghost.score || 0) + 300;
+        }
+      }
+    }
+
+    function startGameLoop() {
+      setInterval(() => {
+        computeMovementVector();
+        const cmds = pendingCommands.splice(0, pendingCommands.length);
+        const payload = {
+          id: clientId,
+          name: myName,
+          role: myRole,
+          dx: Number(inputState.dx.toFixed(3)),
+          dy: Number(inputState.dy.toFixed(3)),
+          angle: Number(inputState.angle.toFixed(3)),
+          turbo: !!inputState.turbo,
+          hunterStun: !!inputState.hunterStun,
+          ghostSkill1: !!inputState.ghostSkill1,
+          ghostSkill2: !!inputState.ghostSkill2,
+          ghostSkill3: !!inputState.ghostSkill3,
+          ghostSkill4: !!inputState.ghostSkill4,
+          commands: cmds
+        };
+        inputState.hunterStun = false;
+        inputState.ghostSkill1 = false;
+        inputState.ghostSkill2 = false;
+        inputState.ghostSkill3 = false;
+        inputState.ghostSkill4 = false;
+
+        if (netMode === 'p2p_client' && hostConn && hostConn.open) {
+          hostConn.send(payload);
+        } else {
+          applyPlayerPayloadToEngine(payload);
+          stepHostSimulation(0.045);
+          const snapshot = {
+            status: hostEngine.status,
+            stageIndex: hostEngine.stageIndex,
+            stageName: hostEngine.stageName,
+            winner: hostEngine.winner,
+            winReason: hostEngine.winReason,
+            toast: hostEngine.toast,
+            timeLeft: hostEngine.timeLeft,
+            blackoutTimer: hostEngine.blackoutTimer,
+            relicsCollected: hostEngine.relicsCollected,
+            relicsTarget: hostEngine.relicsTarget,
+            players: Object.values(hostEngine.players),
+            clones: hostEngine.clones,
+            relics: hostEngine.relics,
+            stations: hostEngine.stations,
+            walls: hostEngine.walls
+          };
+          onServerStateUpdate(snapshot);
+          if (netMode === 'p2p_host') {
+            for (const c of Object.values(clientConns)) {
+              if (c && c.open) c.send(snapshot);
+            }
+          }
+        }
+      }, 45);
+    }
+
+    // ========================================================================
+    // ATUALIZAÇÃO DO HUD, PLACAR DE PONTOS E TRANSIÇÃO DE FASES
+    // ========================================================================
+    let prevGameStatus = 'lobby';
+
+    function onServerStateUpdate(state) {
+      gameState = state;
+
+      if (prevGameStatus === 'lobby' && state.status === 'playing' && isTouchDevice) {
+        forceFullscreenNow();
+      }
+      prevGameStatus = state.status;
+
+      if (state.toast && state.toast !== lastToastText) {
+        lastToastText = state.toast;
+        if (state.toast.includes('Tesouro') || state.toast.includes('TODOS')) playSound('relic');
+        else if (state.toast.includes('TRAVOU')) playSound('stun');
+        else if (state.toast.includes('congelou')) playSound('freeze');
+        else if (state.toast.includes('salvou')) playSound('rescue');
+        else if (state.toast.includes('Apagão')) playSound('blackout');
+        else if (state.toast.includes('Salto')) playSound('teleport');
+      }
+
+      const lobbyEl = document.getElementById('lobby-screen');
+      const gameEl = document.getElementById('game-screen');
+      const modalEl = document.getElementById('gameover-modal');
+
+      if (state.status === 'lobby') {
+        lobbyEl.classList.remove('hidden');
+        gameEl.classList.add('hidden');
+        modalEl.classList.add('hidden');
+        renderLobbyPlayers(state.players);
+      } else {
+        lobbyEl.classList.add('hidden');
+        gameEl.classList.remove('hidden');
+        updateHUD(state);
+
+        if (state.status === 'gameover') {
+          modalEl.classList.remove('hidden');
+          const titleEl = document.getElementById('gameover-title');
+          const descEl = document.getElementById('gameover-desc');
+          const iconEl = document.getElementById('gameover-icon');
+          if (state.winner === 'hunters') {
+            iconEl.textContent = '🔦💎🏆';
+            titleEl.textContent = 'Vitória dos Caçadores!';
+            descEl.textContent = `Todos os ${state.relicsTarget} Tesouros foram recolhidos em ${state.stageName}!`;
+          } else {
+            iconEl.textContent = '👻🌙';
+            titleEl.textContent = 'Vitória do Fantasma!';
+            descEl.textContent = state.winReason || 'O Fantasma impediu o resgate dos tesouros!';
+          }
+
+          const sorted = [...state.players].sort((a, b) => (b.score || 0) - (a.score || 0));
+          document.getElementById('gameover-scoreboard').innerHTML = sorted.map((p, idx) => `
+            <div class="flex items-center justify-between px-3 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-zinc-400">#${idx + 1}</span>
+                <span>${p.role === 'ghost' ? '👻' : '🔦'}</span>
+                <span class="font-bold text-white">${escapeHtml(p.name)}</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-sky-300">💎 ${p.treasuresFound || 0}</span>
+                <span class="font-extrabold text-amber-400">${p.score || 0} pts</span>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          modalEl.classList.add('hidden');
+        }
+      }
+    }
+
+    function renderLobbyPlayers(players) {
+      const listEl = document.getElementById('players-list');
+      const countEl = document.getElementById('player-count');
+      if (!listEl || !players) return;
+      countEl.textContent = players.length;
+
+      const sorted = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+      listEl.innerHTML = sorted.map(p => {
+        const isMe = p.id === clientId;
+        const roleBadge = p.role === 'ghost'
+          ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">👻 Fantasma</span>'
+          : '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">🔦 Caçador</span>';
+
+        return `
+          <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900 border ${isMe ? 'border-amber-400/60' : 'border-zinc-800'}">
+            <div class="flex items-center gap-2.5">
+              <span class="w-3.5 h-3.5 rounded-full inline-block" style="background:${p.color}"></span>
+              <span class="text-sm font-semibold text-white">${escapeHtml(p.name)}</span>
+              ${isMe ? '<span class="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">VOCÊ</span>' : ''}
+              ${p.isBot ? '<span class="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">BOT IA</span>' : ''}
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-amber-400">🏆 ${p.score || 0} pts</span>
+              ${roleBadge}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateHUD(state) {
+      const me = state.players.find(p => p.id === clientId) || state.players[0];
+      if (!me) return;
+
+      document.getElementById('hud-stage-name').textContent = state.stageName || '🏰 Fase 1';
+      document.getElementById('hud-relics').textContent = `${state.relicsCollected}/${state.relicsTarget}`;
+      document.getElementById('hud-score').textContent = `${me.score || 0} pts`;
+
+      const secs = Math.max(0, Math.ceil(state.timeLeft));
+      document.getElementById('hud-timer').textContent = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
+
+      const toastEl = document.getElementById('hud-toast');
+      if (state.toast) {
+        toastEl.textContent = state.toast;
+        toastEl.classList.remove('hidden');
+      } else {
+        toastEl.classList.add('hidden');
+      }
+
+      const roleBadge = document.getElementById('hud-role-badge');
+      const energyBox = document.getElementById('hud-energy-box');
+      const ghostBar = document.getElementById('ghost-skillbar');
+      const hunterBar = document.getElementById('hunter-pc-bar');
+      const touchControls = document.getElementById('touch-controls');
+      const btnTouchStun = document.getElementById('btn-touch-stun');
+      const vignette = document.getElementById('screen-vignette');
+
+      const totalHunterStuns = state.players
+        .filter(p => p.role === 'hunter')
+        .reduce((acc, p) => acc + (p.stunCharges || 0), 0);
+
+      if (me.role === 'ghost') {
+        const isStunned = (me.stunTimer || 0) > 0;
+        roleBadge.textContent = isStunned ? `⛓️ TRAVADO! (${me.stunTimer.toFixed(1)}s)` : '👻 Fantasma';
+        roleBadge.className = isStunned ? 'text-xs font-bold text-cyan-300 animate-pulse' : 'text-xs font-bold text-purple-400';
+
+        ghostBar.classList.remove('hidden');
+        hunterBar.classList.add('hidden');
+        if (btnTouchStun) btnTouchStun.classList.add('hidden');
+        if (isTouchDevice) touchControls.classList.remove('hidden');
+        else touchControls.classList.add('hidden');
+
+        const cd1 = Math.ceil(me.phaseCooldown || 0);
+        const active1 = (me.phaseTimer || 0) > 0;
+        document.getElementById('skill-cd-1').textContent = active1 ? '🔥 ATIVO!' : (cd1 > 0 ? `${cd1}s` : 'Pronto');
+
+        const cd2 = Math.ceil(me.blackoutCooldown || 0);
+        document.getElementById('skill-cd-2').textContent = cd2 > 0 ? `${cd2}s` : 'Pronto';
+
+        const cd3 = Math.ceil(me.cloneCooldown || 0);
+        document.getElementById('skill-cd-3').textContent = cd3 > 0 ? `${cd3}s` : 'Pronto';
+
+        const cd4 = Math.ceil(me.dashCooldown || 0);
+        document.getElementById('skill-cd-4').textContent = cd4 > 0 ? `${cd4}s` : 'Pronto';
+
+        const stunStatusEl = document.getElementById('ghost-stun-status');
+        if (stunStatusEl) {
+          stunStatusEl.textContent = isStunned
+            ? `⛓️ TRAVADO (${me.stunTimer.toFixed(1)}s)`
+            : `⛓️ Travas Caçadores: ${totalHunterStuns}`;
+        }
+
+        energyBox.innerHTML = isStunned
+          ? `⛓️ <span class="text-cyan-300">Travado ${me.stunTimer.toFixed(1)}s</span>`
+          : (active1
+              ? '🌀 <span class="text-purple-300">Forma Astral!</span>'
+              : '👻 <span class="text-purple-300">Visão Total</span>');
+
+        vignette.className = isStunned ? 'pointer-events-none absolute inset-0 frozen-vignette' : 'pointer-events-none absolute inset-0';
+      } else {
+        roleBadge.textContent = me.frozen ? '🧊 Congelado!' : '🔦 Caçador';
+        roleBadge.className = me.frozen ? 'text-xs font-bold text-sky-400 animate-pulse' : 'text-xs font-bold text-amber-400';
+
+        ghostBar.classList.add('hidden');
+        if (btnTouchStun) btnTouchStun.classList.remove('hidden');
+        if (isTouchDevice) {
+          touchControls.classList.remove('hidden');
+          hunterBar.classList.add('hidden');
+        } else {
+          touchControls.classList.add('hidden');
+          hunterBar.classList.remove('hidden');
+        }
+
+        const hasStun = (me.stunCharges || 0) > 0;
+        const touchStunLbl = document.getElementById('btn-touch-stun-label');
+        if (touchStunLbl && btnTouchStun) {
+          touchStunLbl.textContent = hasStun ? 'Travar 3s' : 'Usado';
+          btnTouchStun.style.opacity = hasStun && !me.frozen ? '1' : '0.4';
+        }
+        const pcStunCd = document.getElementById('hunter-stun-cd');
+        const btnPcStun = document.getElementById('btn-pc-stun');
+        if (pcStunCd && btnPcStun) {
+          pcStunCd.textContent = hasStun ? 'Pronto (1x)' : 'Já Usado';
+          pcStunCd.className = hasStun ? 'text-xs font-bold text-emerald-400' : 'text-xs font-bold text-zinc-500';
+          btnPcStun.style.opacity = hasStun && !me.frozen ? '1' : '0.45';
+        }
+
+        const bat = Math.round(me.battery || 0);
+        energyBox.innerHTML = `🔋 <span class="${bat < 25 ? 'text-red-400' : 'text-emerald-400'}">${bat}%</span>`;
+
+        const ghost = state.players.find(p => p.role === 'ghost');
+        const cloneNear = (state.clones || []).some(cl => Math.hypot(cl.x - me.x, cl.y - me.y) < 140);
+        if (me.frozen) {
+          vignette.className = 'pointer-events-none absolute inset-0 frozen-vignette';
+        } else if ((ghost && Math.hypot(ghost.x - me.x, ghost.y - me.y) < 250) || cloneNear) {
+          vignette.className = 'pointer-events-none absolute inset-0 danger-vignette';
+          const now = performance.now();
+          if (now - lastHeartbeatAt > 650) { lastHeartbeatAt = now; playSound('heartbeat'); }
+        } else {
+          vignette.className = 'pointer-events-none absolute inset-0';
+        }
+      }
+    }
+
+    // ========================================================================
+    // RENDERIZAÇÃO 60 FPS COM VISÃO LIMPA E FUNDO NAS ETIQUETAS DE NOME
+    // ========================================================================
+    const fogCanvas = document.createElement('canvas');
+    fogCanvas.width = MAP_W;
+    fogCanvas.height = MAP_H;
+    const fogCtx = fogCanvas.getContext('2d');
+
+    // ========================================================================
+    // CÂMERA: Fantasma = visão panorâmica (mapa inteiro)
+    //         Caçadores = visão fechada com zoom, seguindo o próprio jogador
+    // ========================================================================
+    const HUNTER_ZOOM = isTouchDevice ? 2.3 : 2.0;
+    const camera = { x: MAP_W / 2, y: MAP_H / 2, zoom: 1 };
+
+    function drawTagPill(ctx, text, x, y, textColor) {
+      ctx.save();
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      const w = ctx.measureText(text).width + 12;
+      ctx.fillStyle = 'rgba(9, 9, 13, 0.78)';
+      ctx.fillRect(x - w / 2, y - 13, w, 17);
+      ctx.fillStyle = textColor || '#ffffff';
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+      if (!gameState || gameState.status === 'lobby') return;
+
+      const canvas = document.getElementById('game-canvas');
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      const t = performance.now() * 0.004;
+
+      const stage = STAGES[gameState.stageIndex || 0] || STAGES[0];
+      const me = gameState.players.find(p => p.id === clientId) || gameState.players[0];
+      const isGhostView = me && me.role === 'ghost';
+
+      gameState.players.forEach(p => {
+        if (!renderPlayers[p.id]) {
+          renderPlayers[p.id] = { x: p.x, y: p.y, angle: p.angle };
+        } else {
+          renderPlayers[p.id].x += (p.x - renderPlayers[p.id].x) * 0.35;
+          renderPlayers[p.id].y += (p.y - renderPlayers[p.id].y) * 0.35;
+          const diff = Math.atan2(Math.sin(p.angle - renderPlayers[p.id].angle), Math.cos(p.angle - renderPlayers[p.id].angle));
+          renderPlayers[p.id].angle += diff * 0.35;
+        }
+      });
+
+      // Piso temático da Fase
+      // --- Câmera ---
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = '#05050a';
+      ctx.fillRect(0, 0, W, H);
+      if (!isGhostView && me) {
+        const rpMe = renderPlayers[me.id] || me;
+        const targetZoom = HUNTER_ZOOM;
+        camera.zoom += (targetZoom - camera.zoom) * 0.15;
+        const halfW = W / (2 * camera.zoom);
+        const halfH = H / (2 * camera.zoom);
+        const tx = Math.max(halfW, Math.min(MAP_W - halfW, rpMe.x));
+        const ty = Math.max(halfH, Math.min(MAP_H - halfH, rpMe.y));
+        camera.x += (tx - camera.x) * 0.25;
+        camera.y += (ty - camera.y) * 0.25;
+      } else {
+        camera.zoom = 1; camera.x = MAP_W / 2; camera.y = MAP_H / 2;
+      }
+      ctx.setTransform(camera.zoom, 0, 0, camera.zoom, W / 2 - camera.x * camera.zoom, H / 2 - camera.y * camera.zoom);
+
+      ctx.fillStyle = isGhostView ? stage.floorGhost : stage.floorHunter;
+      ctx.fillRect(0, 0, W, H);
+
+      // Ladrilhos
+      ctx.strokeStyle = isGhostView ? 'rgba(168, 85, 247, 0.08)' : 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      for (let y = 0; y <= H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+      // Nomes dos Cômodos (Sempre em áreas abertas longe das recargas e paredes)
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = isGhostView ? 'rgba(192, 132, 252, 0.16)' : 'rgba(255, 255, 255, 0.09)';
+      (stage.rooms || []).forEach(r => ctx.fillText(r.name, r.x, r.y));
+
+      // Estações de Recarga
+      (gameState.stations || []).forEach(st => {
+        ctx.save();
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+        ctx.beginPath(); ctx.arc(st.x, st.y, 32 + Math.sin(t) * 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#10b981'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#34d399';
+        ctx.textAlign = 'center';
+        ctx.fillText('🔋 RECARGA', st.x, st.y + 4);
+        ctx.restore();
+      });
+
+      // Tesouros
+      (gameState.relics || []).forEach(rel => {
+        if (rel.collected) return;
+        ctx.save();
+        const pulse = 11 + Math.sin(t * 1.5 + rel.id) * 3;
+        const grad = ctx.createRadialGradient(rel.x, rel.y, 2, rel.x, rel.y, pulse * 2.3);
+        grad.addColorStop(0, 'rgba(250, 204, 21, 0.9)');
+        grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.55)');
+        grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(rel.x, rel.y, pulse * 2.3, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = '#fef08a'; ctx.strokeStyle = '#eab308'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(rel.x, rel.y - 11); ctx.lineTo(rel.x + 10, rel.y);
+        ctx.lineTo(rel.x, rel.y + 11); ctx.lineTo(rel.x - 10, rel.y);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      });
+
+      // Paredes Temáticas
+      (gameState.walls || []).forEach(w => {
+        ctx.fillStyle = isGhostView ? stage.wallGhost : stage.wallHunter;
+        ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.strokeStyle = isGhostView ? stage.wallStrokeGhost : stage.wallStrokeHunter;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(w.x, w.y, w.w, w.h);
+      });
+
+      // Fachos de Luz das Lanternas
+      const blackoutActive = (gameState.blackoutTimer || 0) > 0;
+      gameState.players.forEach(p => {
+        if (p.role !== 'hunter' || p.frozen || (p.battery || 0) <= 0) return;
+        const rp = renderPlayers[p.id] || p;
+        const aimAngle = (p.id === clientId) ? inputState.angle : rp.angle;
+        const range = blackoutActive ? 150 : (p.turbo ? 350 : 275);
+        const spread = p.turbo ? 0.56 : 0.43;
+
+        ctx.save();
+        const grad = ctx.createRadialGradient(rp.x, rp.y, 12, rp.x, rp.y, range);
+        grad.addColorStop(0, p.turbo ? 'rgba(254, 240, 138, 0.72)' : 'rgba(253, 224, 71, 0.48)');
+        grad.addColorStop(0.65, p.turbo ? 'rgba(251, 191, 36, 0.35)' : 'rgba(251, 191, 36, 0.18)');
+        grad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(rp.x, rp.y);
+        ctx.arc(rp.x, rp.y, range, aimAngle - spread, aimAngle + spread);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // Clones Assustadores (rodeiam o Caçador à distância, sem ficar em cima dele)
+      (gameState.clones || []).forEach(cl => {
+        ctx.save();
+        const wobble = Math.sin(t * 3 + (cl.orbitAngle || 0)) * 3;
+        ctx.globalAlpha = 0.55 + Math.sin(t * 4) * 0.15;
+        const cg = ctx.createRadialGradient(cl.x, cl.y + wobble, 3, cl.x, cl.y + wobble, 34);
+        cg.addColorStop(0, 'rgba(232, 121, 249, 0.75)');
+        cg.addColorStop(1, 'rgba(232, 121, 249, 0)');
+        ctx.fillStyle = cg;
+        ctx.beginPath(); ctx.arc(cl.x, cl.y + wobble, 34, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e879f9';
+        ctx.beginPath(); ctx.arc(cl.x, cl.y + wobble, 16, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#18181b';
+        ctx.beginPath();
+        ctx.arc(cl.x - 5, cl.y - 3 + wobble, 3, 0, Math.PI * 2);
+        ctx.arc(cl.x + 5, cl.y - 3 + wobble, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath(); ctx.ellipse(cl.x, cl.y + 6 + wobble, 4, 5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+        drawTagPill(ctx, cl.scaring ? '😱 BUUU!' : '👻 Fantasma', cl.x, cl.y - 26 + wobble, cl.scaring ? '#fda4af' : '#f5d0fe');
+        ctx.restore();
+      });
+
+      // Jogadores (Bolhas Primeiro, depois Etiquetas de Nome para nunca ficar debaixo de outro círculo!)
+      gameState.players.forEach(p => {
+        const rp = renderPlayers[p.id] || p;
+        if (p.role === 'ghost') {
+          const distToMe = me ? Math.hypot(rp.x - (renderPlayers[me.id]?.x || me.x), rp.y - (renderPlayers[me.id]?.y || me.y)) : 999;
+          const stunnedG = (p.stunTimer || 0) > 0;
+          if (!isGhostView && !p.lit && !stunnedG && distToMe > 95) return;
+
+          ctx.save();
+          if (p.phaseTimer > 0) ctx.globalAlpha = 0.55;
+          const auraGrad = ctx.createRadialGradient(rp.x, rp.y, 4, rp.x, rp.y, 36);
+          auraGrad.addColorStop(0, stunnedG ? 'rgba(34, 211, 238, 0.85)' : (p.lit ? 'rgba(239, 68, 68, 0.8)' : 'rgba(168, 85, 247, 0.7)'));
+          auraGrad.addColorStop(1, 'rgba(168, 85, 247, 0)');
+          ctx.fillStyle = auraGrad;
+          ctx.beginPath(); ctx.arc(rp.x, rp.y, 36, 0, Math.PI * 2); ctx.fill();
+
+          ctx.fillStyle = stunnedG ? '#67e8f9' : (p.lit ? '#ef4444' : '#c084fc');
+          ctx.beginPath(); ctx.arc(rp.x, rp.y, 17, 0, Math.PI * 2); ctx.fill();
+          ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(rp.x - 5, rp.y - 3, 3, 0, Math.PI * 2);
+          ctx.arc(rp.x + 5, rp.y - 3, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Correntes elétricas quando travado pelos Caçadores
+          if (stunnedG) {
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#22d3ee';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([6, 4]);
+            ctx.lineDashOffset = -t * 20;
+            ctx.beginPath(); ctx.arc(rp.x, rp.y, 26, 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.lineWidth = 2;
+            for (let k = 0; k < 4; k++) {
+              const a = k * Math.PI / 2 + t * 0.5;
+              ctx.beginPath();
+              ctx.moveTo(rp.x + Math.cos(a) * 18, rp.y + Math.sin(a) * 18);
+              ctx.lineTo(rp.x + Math.cos(a + 0.25) * 30, rp.y + Math.sin(a + 0.25) * 30);
+              ctx.lineTo(rp.x + Math.cos(a - 0.1) * 38, rp.y + Math.sin(a - 0.1) * 38);
+              ctx.stroke();
+            }
+            // Barra de tempo restante (3s)
+            ctx.strokeStyle = '#a5f3fc'; ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(rp.x, rp.y, 31, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (p.stunTimer / 3));
+            ctx.stroke();
+          }
+          ctx.restore();
+        } else {
+          ctx.save();
+          if (isGhostView && p.moving && !p.frozen) {
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.38)';
+            ctx.lineWidth = 1.5;
+            const rWave = 18 + ((performance.now() * 0.05) % 30);
+            ctx.beginPath(); ctx.arc(rp.x, rp.y, rWave, 0, Math.PI * 2); ctx.stroke();
+          }
+          ctx.fillStyle = p.frozen ? '#38bdf8' : p.color;
+          ctx.beginPath(); ctx.arc(rp.x, rp.y, 15, 0, Math.PI * 2); ctx.fill();
+          ctx.lineWidth = 2.5; ctx.strokeStyle = p.id === clientId ? '#ffffff' : '#18181b'; ctx.stroke();
+
+          if (p.frozen) {
+            ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 3;
+            ctx.strokeRect(rp.x - 18, rp.y - 18, 36, 36);
+            if ((p.rescueProgress || 0) > 0) {
+              ctx.strokeStyle = '#fde047'; ctx.lineWidth = 4;
+              ctx.beginPath();
+              ctx.arc(rp.x, rp.y, 24, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * (p.rescueProgress / 100)));
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+        }
+      });
+
+      // Camada de Etiquetas de Nome (com pílula escura de fundo para leitura perfeita!)
+      gameState.players.forEach(p => {
+        const rp = renderPlayers[p.id] || p;
+        if (p.role === 'ghost') {
+          const distToMe = me ? Math.hypot(rp.x - (renderPlayers[me.id]?.x || me.x), rp.y - (renderPlayers[me.id]?.y || me.y)) : 999;
+          const stunnedTag = (p.stunTimer || 0) > 0;
+          if (!isGhostView && !p.lit && !stunnedTag && distToMe > 95) return;
+          if (stunnedTag) {
+            drawTagPill(ctx, `⛓️ TRAVADO! (${p.stunTimer.toFixed(1)}s)`, rp.x, rp.y - 42, '#67e8f9');
+          } else {
+            drawTagPill(ctx, p.lit ? '🔥 QUEIMANDO!' : `👻 ${p.name}`, rp.x, rp.y - 24, p.lit ? '#fca5a5' : '#e9d5ff');
+          }
+        } else {
+          drawTagPill(ctx, p.frozen ? `🧊 ${p.name} (SALVE!)` : `${p.name} (${p.score || 0}p)`, rp.x, rp.y - 23, p.frozen ? '#7dd3fc' : '#ffffff');
+        }
+      });
+
+      // Fog of War (Para Caçadores)
+      if (!isGhostView && me) {
+        fogCtx.clearRect(0, 0, W, H);
+        fogCtx.globalCompositeOperation = 'source-over';
+        fogCtx.fillStyle = blackoutActive ? 'rgba(3, 3, 7, 0.96)' : 'rgba(6, 6, 12, 0.92)';
+        fogCtx.fillRect(0, 0, W, H);
+        fogCtx.globalCompositeOperation = 'destination-out';
+
+        gameState.players.forEach(p => {
+          if (p.role !== 'hunter') return;
+          const rp = renderPlayers[p.id] || p;
+          const auraR = p.id === clientId ? 82 : 55;
+          const aura = fogCtx.createRadialGradient(rp.x, rp.y, 12, rp.x, rp.y, auraR);
+          aura.addColorStop(0, 'rgba(0,0,0,1)');
+          aura.addColorStop(1, 'rgba(0,0,0,0)');
+          fogCtx.fillStyle = aura;
+          fogCtx.beginPath(); fogCtx.arc(rp.x, rp.y, auraR, 0, Math.PI * 2); fogCtx.fill();
+
+          if (!p.frozen && (p.battery || 0) > 0) {
+            const aimAngle = (p.id === clientId) ? inputState.angle : rp.angle;
+            const range = blackoutActive ? 150 : (p.turbo ? 350 : 275);
+            const spread = p.turbo ? 0.58 : 0.45;
+            const coneGrad = fogCtx.createRadialGradient(rp.x, rp.y, 10, rp.x, rp.y, range);
+            coneGrad.addColorStop(0, 'rgba(0,0,0,1)');
+            coneGrad.addColorStop(0.85, 'rgba(0,0,0,0.92)');
+            coneGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            fogCtx.fillStyle = coneGrad;
+            fogCtx.beginPath();
+            fogCtx.moveTo(rp.x, rp.y);
+            fogCtx.arc(rp.x, rp.y, range, aimAngle - spread, aimAngle + spread);
+            fogCtx.closePath();
+            fogCtx.fill();
+          }
+        });
+        ctx.drawImage(fogCanvas, 0, 0);
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      // ======================================================================
+      // HUD DA CÂMERA DO CAÇADOR: SETAS GUIA PARA OS TESOUROS QUE FALTAM
+      // Como o Caçador tem visão fechada, as setinhas na borda ajudam a achar!
+      // ======================================================================
+      if (!isGhostView && me && !me.frozen) {
+        const rpMe = renderPlayers[me.id] || me;
+        const uncollected = (gameState.relics || []).filter(r => !r.collected);
+        
+        uncollected.forEach(rel => {
+          // Coordenada do tesouro projetada na tela (espaço de visualização da câmera)
+          const sx = (rel.x - camera.x) * camera.zoom + W / 2;
+          const sy = (rel.y - camera.y) * camera.zoom + H / 2;
+          
+          // Se estiver fora da tela visível do Caçador, desenha uma setinha indicadora na borda
+          const margin = 38;
+          const isOffScreen = sx < margin || sx > W - margin || sy < margin || sy > H - margin;
+          
+          if (isOffScreen) {
+            const angleToRelic = Math.atan2(rel.y - rpMe.y, rel.x - rpMe.x);
+            // Ponto de interseção com a borda da tela
+            const edgeX = Math.max(margin, Math.min(W - margin, W / 2 + Math.cos(angleToRelic) * (W / 2 - margin)));
+            const edgeY = Math.max(margin, Math.min(H - margin, H / 2 + Math.sin(angleToRelic) * (H / 2 - margin)));
+            const distM = Math.round(Math.hypot(rel.x - rpMe.x, rel.y - rpMe.y) / 10);
+
+            ctx.save();
+            ctx.translate(edgeX, edgeY);
+            ctx.rotate(angleToRelic);
+            
+            // Desenha seta pulsante dourada
+            ctx.fillStyle = '#facc15';
+            ctx.shadowColor = '#eab308';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.moveTo(14, 0);
+            ctx.lineTo(-6, -8);
+            ctx.lineTo(-2, 0);
+            ctx.lineTo(-6, 8);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            // Distância em metros embaixo da setinha
+            ctx.save();
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(edgeX - 16, edgeY + 10, 32, 13);
+            ctx.fillStyle = '#fde047';
+            ctx.fillText(`${distM}m`, edgeX, edgeY + 20);
+            ctx.restore();
+          }
+        });
+
+        // Alerta na borda se um colega estiver congelado precisando de resgate!
+        const frozenAllies = (gameState.players || []).filter(p => p.role === 'hunter' && p.frozen && p.id !== me.id);
+        frozenAllies.forEach(ally => {
+          const rpAlly = renderPlayers[ally.id] || ally;
+          const sx = (rpAlly.x - camera.x) * camera.zoom + W / 2;
+          const sy = (rpAlly.y - camera.y) * camera.zoom + H / 2;
+          const margin = 42;
+          if (sx < margin || sx > W - margin || sy < margin || sy > H - margin) {
+            const angleToAlly = Math.atan2(rpAlly.y - rpMe.y, rpAlly.x - rpMe.x);
+            const edgeX = Math.max(margin, Math.min(W - margin, W / 2 + Math.cos(angleToAlly) * (W / 2 - margin)));
+            const edgeY = Math.max(margin, Math.min(H - margin, H / 2 + Math.sin(angleToAlly) * (H / 2 - margin)));
+            
+            ctx.save();
+            ctx.translate(edgeX, edgeY);
+            ctx.rotate(angleToAlly);
+            ctx.fillStyle = '#38bdf8';
+            ctx.shadowColor = '#0284c7';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(14, 0);
+            ctx.lineTo(-7, -9);
+            ctx.lineTo(-3, 0);
+            ctx.lineTo(-7, 9);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            drawTagPill(ctx, `🆘 ${ally.name}`, edgeX, edgeY + 16, '#7dd3fc');
+          }
+        });
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, s => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[s]));
+    }
+  </script>
+</body>
+</html>
