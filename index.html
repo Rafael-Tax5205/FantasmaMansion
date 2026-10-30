@@ -393,8 +393,35 @@
     }
 
     window.startWithFullscreen = function() {
+      ensureAudio();
       tryAutoFullscreen();
-      sendLobbyCommand('start_game');
+      if (netMode === 'p2p_client' && hostConn && hostConn.open) {
+        sendLobbyCommand('start_game');
+      } else {
+        startHostMatch();
+        // Dispara snapshot imediato para a tela de jogo transicionar no ato
+        const snapshot = {
+          status: hostEngine.status,
+          stageIndex: hostEngine.stageIndex,
+          stageName: hostEngine.stageName,
+          winner: hostEngine.winner,
+          winReason: hostEngine.winReason,
+          toast: hostEngine.toast,
+          timeLeft: hostEngine.timeLeft,
+          blackoutTimer: hostEngine.blackoutTimer,
+          relicsCollected: hostEngine.relicsCollected,
+          relicsTarget: hostEngine.relicsTarget,
+          generatorsActive: hostEngine.generatorsActive || 0,
+          generators: hostEngine.generators || [],
+          players: Object.values(hostEngine.players),
+          clones: hostEngine.clones,
+          relics: hostEngine.relics,
+          stations: hostEngine.stations,
+          walls: hostEngine.walls,
+          doors: hostEngine.doors || []
+        };
+        onServerStateUpdate(snapshot);
+      }
     };
 
     // ========================================================================
@@ -620,16 +647,25 @@
     let hostConn = null;
     let clientConns = {};
 
-    window.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('player-name').value = myName;
+    function initGameApp() {
+      const pNameInput = document.getElementById('player-name');
+      if (pNameInput) pNameInput.value = myName;
       updateRoleButtonsUI();
       setupKeyboardAndMouse();
       setupTouchJoysticks();
-      pendingCommands.push({ action: 'init_default_bots' });
       startGameLoop();
       requestAnimationFrame(renderLoop);
       tryAutoJoinFromUrl();
-    });
+      if (typeof hostEngine !== 'undefined' && hostEngine.players) {
+        renderLobbyPlayers(Object.values(hostEngine.players));
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', initGameApp);
+    } else {
+      initGameApp();
+    }
 
     // ========================================================================
     // ATALHOS DE TECLADO NO PC + MOUSE
@@ -1036,6 +1072,7 @@
     // MOTOR DO JOGO COM 3 FASES RANDOMIZADAS & PONTUAÇÃO POR TESOURO
     // ========================================================================
     let lastStageIndex = -1;
+    const palette = ['#fbbf24', '#38bdf8', '#34d399', '#f472b6', '#a78bfa'];
 
     const hostEngine = {
       status: 'lobby',
@@ -1050,14 +1087,42 @@
       botStunCooldown: 0,
       relicsCollected: 0,
       relicsTarget: 8,
-      players: {},
+      players: {
+        [clientId]: {
+          id: clientId,
+          name: myName,
+          role: myRole,
+          color: myRole === 'ghost' ? '#c084fc' : palette[0],
+          x: 800, y: 740, dx: 0, dy: 0, angle: 0,
+          battery: 100, turbo: false, frozen: false, rescueProgress: 0,
+          lit: false, moving: false,
+          stunCharges: 1, stunTimer: 0, stunnedBy: '',
+          phaseTimer: 0, phaseCooldown: 0,
+          blackoutCooldown: 0, cloneCooldown: 0, dashCooldown: 0,
+          score: 0, treasuresFound: 0,
+          isBot: false
+        },
+        'bot_init_1': {
+          id: 'bot_init_1', name: 'Pedrão', role: 'hunter', color: '#fbbf24',
+          x: 765, y: 740, dx: 0, dy: 0, angle: 0, battery: 100, turbo: false, frozen: false, rescueProgress: 0,
+          lit: false, moving: false, stunCharges: 1, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
+        },
+        'bot_init_2': {
+          id: 'bot_init_2', name: 'Queijo', role: 'hunter', color: '#38bdf8',
+          x: 810, y: 740, dx: 0, dy: 0, angle: 0, battery: 100, turbo: false, frozen: false, rescueProgress: 0,
+          lit: false, moving: false, stunCharges: 1, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
+        },
+        'bot_init_3': {
+          id: 'bot_init_3', name: 'Bibidi', role: 'hunter', color: '#34d399',
+          x: 855, y: 740, dx: 0, dy: 0, angle: 0, battery: 100, turbo: false, frozen: false, rescueProgress: 0,
+          lit: false, moving: false, stunCharges: 1, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
+        }
+      },
       clones: [],
       walls: STAGES[0].walls,
       stations: STAGES[0].stations,
       relics: []
     };
-
-    const palette = ['#fbbf24', '#38bdf8', '#34d399', '#f472b6', '#a78bfa'];
 
     function applyPlayerPayloadToEngine(payload) {
       let p = hostEngine.players[payload.id];
@@ -2456,38 +2521,6 @@
           }
         });
       }
-
-        // Alerta na borda se um colega estiver congelado precisando de resgate!
-        const frozenAllies = (gameState.players || []).filter(p => p.role === 'hunter' && p.frozen && p.id !== me.id);
-        frozenAllies.forEach(ally => {
-          const rpAlly = renderPlayers[ally.id] || ally;
-          const sx = (rpAlly.x - camera.x) * camera.zoom + W / 2;
-          const sy = (rpAlly.y - camera.y) * camera.zoom + H / 2;
-          const margin = 42;
-          if (sx < margin || sx > W - margin || sy < margin || sy > H - margin) {
-            const angleToAlly = Math.atan2(rpAlly.y - rpMe.y, rpAlly.x - rpMe.x);
-            const edgeX = Math.max(margin, Math.min(W - margin, W / 2 + Math.cos(angleToAlly) * (W / 2 - margin)));
-            const edgeY = Math.max(margin, Math.min(H - margin, H / 2 + Math.sin(angleToAlly) * (H / 2 - margin)));
-            
-            ctx.save();
-            ctx.translate(edgeX, edgeY);
-            ctx.rotate(angleToAlly);
-            ctx.fillStyle = '#38bdf8';
-            ctx.shadowColor = '#0284c7';
-            ctx.shadowBlur = 10;
-            ctx.beginPath();
-            ctx.moveTo(14, 0);
-            ctx.lineTo(-7, -9);
-            ctx.lineTo(-3, 0);
-            ctx.lineTo(-7, 9);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-
-            drawTagPill(ctx, `🆘 ${ally.name}`, edgeX, edgeY + 16, '#7dd3fc');
-          }
-        });
-      }
     }
 
     function escapeHtml(str) {
@@ -2495,9 +2528,6 @@
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[s]));
     }
-  </script>
-</body>
-</html>
   </script>
 </body>
 </html>
