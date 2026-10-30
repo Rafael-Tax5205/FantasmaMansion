@@ -803,21 +803,82 @@
         } else {
           stickLeftVec.x = dx / maxDist;
           stickLeftVec.y = dy / maxDist;
-          if (stickRightTouchId === null && Math.hypot(stickLeftVec.x, stickLeftVec.y) > 0.25) {
+          if (stickRightTouchId === null && Math.hypot(stickLeftVec.x, stickLeftVec.y) > 0.2) {
             inputState.angle = Math.atan2(stickLeftVec.y, stickLeftVec.x);
           }
         }
       }
 
+      // --- SUPORTE TOUCH NATIVO (ALTA TAXA DE ATUALIZAÇÃO E MULTI-TOQUE 100% INDEPENDENTE) ---
+      function onTouchLeft(e) {
+        e.preventDefault();
+        for (let i = 0; i < e.touches.length; i++) {
+          const t = e.touches[i];
+          if (stickLeftTouchId === null || t.identifier === stickLeftTouchId) {
+            stickLeftTouchId = t.identifier;
+            handleStick(leftZone, leftKnob, t.clientX, t.clientY, false);
+            break;
+          }
+        }
+      }
+      function onTouchEndLeft(e) {
+        e.preventDefault();
+        let stillActive = false;
+        for (let i = 0; i < e.touches.length; i++) {
+          if (e.touches[i].identifier === stickLeftTouchId) stillActive = true;
+        }
+        if (!stillActive) {
+          stickLeftTouchId = null; stickLeftVec.x = 0; stickLeftVec.y = 0;
+          leftKnob.style.transform = 'translate(0px, 0px)';
+        }
+      }
+
+      leftZone.addEventListener('touchstart', (e) => { ensureAudio(); tryAutoFullscreen(); onTouchLeft(e); }, { passive: false });
+      leftZone.addEventListener('touchmove', onTouchLeft, { passive: false });
+      leftZone.addEventListener('touchend', onTouchEndLeft, { passive: false });
+      leftZone.addEventListener('touchcancel', onTouchEndLeft, { passive: false });
+
+      function onTouchRight(e) {
+        e.preventDefault();
+        for (let i = 0; i < e.touches.length; i++) {
+          const t = e.touches[i];
+          if (stickRightTouchId === null || t.identifier === stickRightTouchId) {
+            stickRightTouchId = t.identifier;
+            handleStick(rightZone, rightKnob, t.clientX, t.clientY, true);
+            break;
+          }
+        }
+      }
+      function onTouchEndRight(e) {
+        e.preventDefault();
+        let stillActive = false;
+        for (let i = 0; i < e.touches.length; i++) {
+          if (e.touches[i].identifier === stickRightTouchId) stillActive = true;
+        }
+        if (!stillActive) {
+          stickRightTouchId = null;
+          rightKnob.style.transform = 'translate(0px, 0px)';
+        }
+      }
+
+      rightZone.addEventListener('touchstart', (e) => { ensureAudio(); tryAutoFullscreen(); onTouchRight(e); }, { passive: false });
+      rightZone.addEventListener('touchmove', onTouchRight, { passive: false });
+      rightZone.addEventListener('touchend', onTouchEndRight, { passive: false });
+      rightZone.addEventListener('touchcancel', onTouchEndRight, { passive: false });
+
+      // Fallback para mouse/pointer no computador
       leftZone.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'touch') return;
         ensureAudio(); tryAutoFullscreen();
         stickLeftTouchId = e.pointerId; leftZone.setPointerCapture(e.pointerId);
         handleStick(leftZone, leftKnob, e.clientX, e.clientY, false);
       });
       leftZone.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') return;
         if (e.pointerId === stickLeftTouchId) handleStick(leftZone, leftKnob, e.clientX, e.clientY, false);
       });
       const resetL = (e) => {
+        if (e.pointerType === 'touch') return;
         if (e.pointerId === stickLeftTouchId) {
           stickLeftTouchId = null; stickLeftVec.x = 0; stickLeftVec.y = 0;
           leftKnob.style.transform = 'translate(0px, 0px)';
@@ -827,14 +888,17 @@
       leftZone.addEventListener('pointercancel', resetL);
 
       rightZone.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'touch') return;
         ensureAudio(); tryAutoFullscreen();
         stickRightTouchId = e.pointerId; rightZone.setPointerCapture(e.pointerId);
         handleStick(rightZone, rightKnob, e.clientX, e.clientY, true);
       });
       rightZone.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') return;
         if (e.pointerId === stickRightTouchId) handleStick(rightZone, rightKnob, e.clientX, e.clientY, true);
       });
       const resetR = (e) => {
+        if (e.pointerType === 'touch') return;
         if (e.pointerId === stickRightTouchId) {
           stickRightTouchId = null;
           rightKnob.style.transform = 'translate(0px, 0px)';
@@ -854,7 +918,14 @@
         const len = Math.hypot(kx, ky);
         inputState.dx = kx / len; inputState.dy = ky / len;
       } else {
-        inputState.dx = stickLeftVec.x; inputState.dy = stickLeftVec.y;
+        const stickMag = Math.hypot(stickLeftVec.x, stickLeftVec.y);
+        if (stickMag > 0.08) {
+          inputState.dx = stickLeftVec.x;
+          inputState.dy = stickLeftVec.y;
+        } else {
+          inputState.dx = 0;
+          inputState.dy = 0;
+        }
       }
     }
 
@@ -1335,7 +1406,7 @@
     // ========================================================================
     function isCollidingWithWall(cx, cy, r = 16, ignoreInner = false, ignoreDoors = false) {
       if (cx - r < 20 || cx + r > MAP_W - 20 || cy - r < 20 || cy + r > MAP_H - 20) return true;
-      const walls = hostEngine.walls || [];
+      const walls = (hostEngine && hostEngine.walls && hostEngine.walls.length) ? hostEngine.walls : ((gameState && gameState.walls) || []);
       for (let i = 0; i < walls.length; i++) {
         const w = walls[i];
         if (ignoreInner && !w.border) continue;
@@ -1344,9 +1415,10 @@
         if (Math.hypot(cx - kx, cy - ky) < r) return true;
       }
       // Portas Fechadas bloqueiam Caçadores, mas o Fantasma atravessa livremente!
-      if (!ignoreDoors && hostEngine.doors) {
-        for (let i = 0; i < hostEngine.doors.length; i++) {
-          const d = hostEngine.doors[i];
+      if (!ignoreDoors) {
+        const doors = (hostEngine && hostEngine.doors && hostEngine.doors.length) ? hostEngine.doors : ((gameState && gameState.doors) || []);
+        for (let i = 0; i < doors.length; i++) {
+          const d = doors[i];
           if (!d.isOpen) {
             const kx = Math.max(d.x, Math.min(cx, d.x + d.w));
             const ky = Math.max(d.y, Math.min(cy, d.y + d.h));
@@ -1977,7 +2049,7 @@
           hostConn.send(payload);
         } else {
           applyPlayerPayloadToEngine(payload);
-          stepHostSimulation(0.045);
+          stepHostSimulation(0.033);
           const snapshot = {
             status: hostEngine.status,
             stageIndex: hostEngine.stageIndex,
@@ -2005,7 +2077,7 @@
             }
           }
         }
-      }, 45);
+      }, 33);
     }
 
     // ========================================================================
@@ -2256,31 +2328,88 @@
       ctx.restore();
     }
 
+    let lastRenderTimestamp = performance.now();
+
     function renderLoop() {
       requestAnimationFrame(renderLoop);
       if (!gameState || gameState.status === 'lobby') return;
 
+      const nowMs = performance.now();
+      const dt = Math.min(0.06, Math.max(0.001, (nowMs - lastRenderTimestamp) / 1000));
+      lastRenderTimestamp = nowMs;
+
       const canvas = document.getElementById('game-canvas');
       const ctx = canvas.getContext('2d');
       const W = canvas.width, H = canvas.height;
-      const t = performance.now() * 0.004;
+      const t = nowMs * 0.004;
 
       const stage = STAGES[gameState.stageIndex || 0] || STAGES[0];
       const me = gameState.players.find(p => p.id === clientId) || gameState.players[0];
       const isGhostView = me && me.role === 'ghost';
 
+      // 1. PREVISÃO CLIENT-SIDE INSTANTÂNEA PARA O PRÓPRIO JOGADOR (CELULAR OU NOTEBOOK)
+      // O jogador responde no mesmo frame (0ms de atraso / 60 FPS cravado, sem travas!)
+      if (me) {
+        if (!renderPlayers[me.id]) {
+          renderPlayers[me.id] = { x: me.x, y: me.y, angle: me.angle };
+        }
+        computeMovementVector();
+        
+        if (!me.frozen && (me.stunTimer || 0) <= 0) {
+          const baseSpd = (me.role === 'ghost') ? ((me.phaseTimer > 0) ? 185 : 155) : (inputState.turbo && (me.battery || 0) > 0 ? 235 : 200);
+          const currentSpd = (me.role === 'ghost' && me.lit) ? 75 : baseSpd;
+          const mag = Math.hypot(inputState.dx, inputState.dy);
+          if (mag > 0.05) {
+            const vx = (inputState.dx / Math.max(1, mag)) * currentSpd * dt;
+            const vy = (inputState.dy / Math.max(1, mag)) * currentSpd * dt;
+            const isGhost = (me.role === 'ghost');
+            const ignoreInner = isGhost && (me.phaseTimer > 0);
+            
+            // Sub-stepping local fluido contra paredes
+            const steps = Math.max(1, Math.ceil(Math.hypot(vx, vy) / 3));
+            const svx = vx / steps, svy = vy / steps;
+            for (let s = 0; s < steps; s++) {
+              const nx = Math.max(28, Math.min(MAP_W - 28, renderPlayers[me.id].x + svx));
+              const ny = Math.max(28, Math.min(MAP_H - 28, renderPlayers[me.id].y + svy));
+              if (!isCollidingWithWall(nx, ny, 16, ignoreInner, isGhost)) {
+                renderPlayers[me.id].x = nx;
+                renderPlayers[me.id].y = ny;
+              } else {
+                if (!isCollidingWithWall(nx, renderPlayers[me.id].y, 16, ignoreInner, isGhost)) renderPlayers[me.id].x = nx;
+                if (!isCollidingWithWall(renderPlayers[me.id].x, ny, 16, ignoreInner, isGhost)) renderPlayers[me.id].y = ny;
+              }
+            }
+          }
+        }
+        
+        if (netMode === 'p2p_client') {
+          // Reconciliação suave com o Host oficial sem solavancos
+          const errDist = Math.hypot(me.x - renderPlayers[me.id].x, me.y - renderPlayers[me.id].y);
+          if (errDist > 55) {
+            renderPlayers[me.id].x = me.x;
+            renderPlayers[me.id].y = me.y;
+          } else if (errDist > 1.5) {
+            renderPlayers[me.id].x += (me.x - renderPlayers[me.id].x) * 0.12;
+            renderPlayers[me.id].y += (me.y - renderPlayers[me.id].y) * 0.12;
+          }
+          renderPlayers[me.id].angle = inputState.angle;
+        } else {
+          renderPlayers[me.id].x = me.x;
+          renderPlayers[me.id].y = me.y;
+          renderPlayers[me.id].angle = inputState.angle;
+        }
+      }
+
+      // 2. INTERPOLAÇÃO CONTÍNUA PARA OUTROS JOGADORES E BOTS (ELIMINA TREMEDEIRAS)
       gameState.players.forEach(p => {
         if (!renderPlayers[p.id]) {
           renderPlayers[p.id] = { x: p.x, y: p.y, angle: p.angle };
-        } else if (p.id === clientId && netMode !== 'p2p_client') {
-          renderPlayers[p.id].x = p.x;
-          renderPlayers[p.id].y = p.y;
-          renderPlayers[p.id].angle = p.angle;
-        } else {
-          renderPlayers[p.id].x += (p.x - renderPlayers[p.id].x) * 0.45;
-          renderPlayers[p.id].y += (p.y - renderPlayers[p.id].y) * 0.45;
+        } else if (p.id !== clientId) {
+          const lerpFactor = Math.min(1, 15 * dt);
+          renderPlayers[p.id].x += (p.x - renderPlayers[p.id].x) * lerpFactor;
+          renderPlayers[p.id].y += (p.y - renderPlayers[p.id].y) * lerpFactor;
           const diff = Math.atan2(Math.sin(p.angle - renderPlayers[p.id].angle), Math.cos(p.angle - renderPlayers[p.id].angle));
-          renderPlayers[p.id].angle += diff * 0.45;
+          renderPlayers[p.id].angle += diff * lerpFactor;
         }
       });
 
