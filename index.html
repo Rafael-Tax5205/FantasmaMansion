@@ -1581,16 +1581,22 @@
           return { dx: Math.cos(pAngle), dy: Math.sin(pAngle), angle: pAngle };
         }
 
-        // Teste de desvio angular simétrico em leque (Steering / Wall Hugging):
+        // Teste de desvio angular com persistência direcional (evita que o bot fique oscilando loucamente entre esquerda e direita)
+        bot.steerSide = bot.steerSide || (Math.random() < 0.5 ? 1 : -1);
         const stepDist = 26;
+
+        // Se o caminho direto está livre, avança direto
+        const directX = bot.x + Math.cos(baseAngle) * stepDist;
+        const directY = bot.y + Math.sin(baseAngle) * stepDist;
+        if (!isCollidingWithWall(directX, directY, 17, isAstral, isGhost)) {
+          return { dx: Math.cos(baseAngle), dy: Math.sin(baseAngle), angle: baseAngle };
+        }
+
+        // Se encontrou obstáculo/parede pela frente, contorna suavemente mantendo o lado escolhido (steerSide)
+        const side = bot.steerSide;
         const testOffsets = [
-          0,
-          0.44, -0.44,
-          0.88, -0.88,
-          1.32, -1.32,
-          1.76, -1.76,
-          2.20, -2.20,
-          2.64, -2.64,
+          side * 0.45, side * 0.85, side * 1.30, side * 1.75, side * 2.20,
+          -side * 0.45, -side * 0.85, -side * 1.30, -side * 1.75, -side * 2.20,
           Math.PI
         ];
 
@@ -1599,6 +1605,7 @@
           const nx = bot.x + Math.cos(testA) * stepDist;
           const ny = bot.y + Math.sin(testA) * stepDist;
           if (!isCollidingWithWall(nx, ny, 17, isAstral, isGhost)) {
+            if (testOffsets[i] * side < 0) bot.steerSide = -side;
             return { dx: Math.cos(testA), dy: Math.sin(testA), angle: testA };
           }
         }
@@ -1656,7 +1663,8 @@
             const nav = getNavDirection(bp, targets[0].x, targets[0].y, true, isAstral);
             bp.dx = nav.dx;
             bp.dy = nav.dy;
-            bp.angle = nav.angle;
+            const turnDiff = Math.atan2(Math.sin(nav.angle - bp.angle), Math.cos(nav.angle - bp.angle));
+            bp.angle += Math.max(-7.0 * dt, Math.min(7.0 * dt, turnDiff));
           }
         } else {
           // Caçador Bot
@@ -1696,23 +1704,27 @@
           bp.dx = nav.dx;
           bp.dy = nav.dy;
 
+          let desiredAim = nav.angle;
           if (ghost && Math.hypot(ghost.x - bp.x, ghost.y - bp.y) < 260) {
             const gDist = Math.hypot(ghost.x - bp.x, ghost.y - bp.y);
             const hasLos = hasLineOfSight(bp.x, bp.y, ghost.x, ghost.y, sightObstacles);
             if (hasLos) {
-              bp.angle = Math.atan2(ghost.y - bp.y, ghost.x - bp.x);
+              desiredAim = Math.atan2(ghost.y - bp.y, ghost.x - bp.x);
               bp.turboReq = gDist < 175 && bp.battery > 30;
               if (gDist < 140 && (bp.stunCharges || 0) > 0 && (ghost.stunTimer || 0) <= 0 && hostEngine.botStunCooldown <= 0) {
                 bp.hunterStun = true;
               }
             } else {
-              bp.angle = nav.angle;
               bp.turboReq = false;
             }
           } else {
-            bp.angle = nav.angle;
             bp.turboReq = false;
           }
+
+          // Rotação suave da lanterna (damping angular que elimina 100% de tremores e oscilações doidas)
+          const turnDiff = Math.atan2(Math.sin(desiredAim - bp.angle), Math.cos(desiredAim - bp.angle));
+          const maxTurn = 6.2 * dt;
+          bp.angle += Math.max(-maxTurn, Math.min(maxTurn, turnDiff));
         }
       }
 
@@ -2376,8 +2388,11 @@
         ctx.restore();
       });
 
-      // Fachos de Luz das Lanternas (Nativos, ultra-fluidos e cobertos naturalmente por paredes/portas)
+      // Fachos de Luz das Lanternas (Raycasting em leque: bloqueio físico real por qualquer pilar, obstáculo ou parede!)
       const blackoutActive = (gameState.blackoutTimer || 0) > 0;
+      const closedDoors = (gameState.doors || []).filter(d => !d.isOpen);
+      const sightObstacles = [...(gameState.walls || []), ...closedDoors];
+
       gameState.players.forEach(p => {
         if (p.role !== 'hunter' || p.frozen || (p.battery || 0) <= 0) return;
         const rp = renderPlayers[p.id] || p;
@@ -2391,9 +2406,17 @@
         grad.addColorStop(0.65, p.turbo ? 'rgba(251, 191, 36, 0.32)' : 'rgba(251, 191, 36, 0.16)');
         grad.addColorStop(1, 'rgba(251, 191, 36, 0)');
         ctx.fillStyle = grad;
+
         ctx.beginPath();
         ctx.moveTo(rp.x, rp.y);
-        ctx.arc(rp.x, rp.y, range, aimAngle - spread, aimAngle + spread);
+        const raySteps = 28;
+        for (let i = 0; i <= raySteps; i++) {
+          const rayAngle = (aimAngle - spread) + (spread * 2) * (i / raySteps);
+          const rdx = Math.cos(rayAngle);
+          const rdy = Math.sin(rayAngle);
+          const hitDist = rayCastToWalls(rp.x, rp.y, rdx, rdy, range, sightObstacles);
+          ctx.lineTo(rp.x + rdx * hitDist, rp.y + rdy * hitDist);
+        }
         ctx.closePath();
         ctx.fill();
         ctx.restore();
