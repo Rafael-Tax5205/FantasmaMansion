@@ -2540,9 +2540,7 @@
         ctx.restore();
       });
 
-      // Obstáculos para luz e visão (paredes + portas fechadas)
-      const closedDoors = (gameState.doors || []).filter(d => !d.isOpen);
-      const sightObstacles = [...(gameState.walls || []), ...closedDoors];
+      // Obstáculos para luz e visão já calculados acima (closedDoors / sightObstacles)
 
       // Clones Assustadores (rodeiam o Caçador à distância, sem ficar em cima dele)
       (gameState.clones || []).forEach(cl => {
