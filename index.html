@@ -152,7 +152,7 @@
               </div>
             </div>
             <p class="text-[11px] text-zinc-400 pt-1">
-              🏆 <strong>Missões:</strong> Recolham os <strong>8 tesouros</strong> e liguem os <strong>2 Geradores ⚡</strong> para iluminar a mansão! Caçadores têm <strong>1 botão ⛓️ Trava (3s)</strong>. O Fantasma agora tem <strong>visão dinâmica limitada</strong>!
+              🏆 <strong>Missões:</strong> Recolham os <strong>8 tesouros</strong> e liguem os <strong>2 Geradores ⚡</strong> para iluminar a mansão! Caçadores têm <strong>3x Trava (3s)</strong> cada. O Fantasma tem <strong>visão dinâmica limitada</strong>!
             </p>
           </div>
 
@@ -788,7 +788,7 @@
       const rightKnob = document.getElementById('stick-right-knob');
       if (!leftZone || !leftKnob || !rightZone || !rightKnob) return;
 
-      function handleStick(zone, knob, clientX, clientY, isRight) {
+      function updateStickPosition(zone, knob, clientX, clientY, isRight) {
         const rect = zone.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
@@ -799,113 +799,106 @@
         if (dist > maxDist) { dx = (dx / dist) * maxDist; dy = (dy / dist) * maxDist; }
         knob.style.transform = `translate(${dx}px, ${dy}px)`;
         if (isRight) {
-          if (dist > 6) inputState.angle = Math.atan2(dy, dx);
+          if (dist > 5) inputState.angle = Math.atan2(dy, dx);
         } else {
           stickLeftVec.x = dx / maxDist;
           stickLeftVec.y = dy / maxDist;
-          if (stickRightTouchId === null && Math.hypot(stickLeftVec.x, stickLeftVec.y) > 0.2) {
+          if (stickRightTouchId === null && Math.hypot(stickLeftVec.x, stickLeftVec.y) > 0.15) {
             inputState.angle = Math.atan2(stickLeftVec.y, stickLeftVec.x);
           }
         }
       }
 
-      // --- SUPORTE TOUCH NATIVO (ALTA TAXA DE ATUALIZAÇÃO E MULTI-TOQUE 100% INDEPENDENTE) ---
-      function onTouchLeft(e) {
+      function resetLeftStick() {
+        stickLeftTouchId = null;
+        stickLeftVec.x = 0;
+        stickLeftVec.y = 0;
+        leftKnob.style.transform = 'translate(0px, 0px)';
+      }
+
+      function resetRightStick() {
+        stickRightTouchId = null;
+        rightKnob.style.transform = 'translate(0px, 0px)';
+      }
+
+      // --- MULTI-TOUCH NATIVO DESACOPLADO (CADA DEDO FICA PRESO EXCLUSIVAMENTE AO SEU DIRECIONAL) ---
+      leftZone.addEventListener('touchstart', (e) => {
+        ensureAudio(); tryAutoFullscreen();
         e.preventDefault();
+        if (stickLeftTouchId === null && e.changedTouches.length > 0) {
+          const t = e.changedTouches[0];
+          stickLeftTouchId = t.identifier;
+          updateStickPosition(leftZone, leftKnob, t.clientX, t.clientY, false);
+        }
+      }, { passive: false });
+
+      rightZone.addEventListener('touchstart', (e) => {
+        ensureAudio(); tryAutoFullscreen();
+        e.preventDefault();
+        if (stickRightTouchId === null && e.changedTouches.length > 0) {
+          const t = e.changedTouches[0];
+          stickRightTouchId = t.identifier;
+          updateStickPosition(rightZone, rightKnob, t.clientX, t.clientY, true);
+        }
+      }, { passive: false });
+
+      window.addEventListener('touchmove', (e) => {
+        if (stickLeftTouchId === null && stickRightTouchId === null) return;
         for (let i = 0; i < e.touches.length; i++) {
           const t = e.touches[i];
-          if (stickLeftTouchId === null || t.identifier === stickLeftTouchId) {
-            stickLeftTouchId = t.identifier;
-            handleStick(leftZone, leftKnob, t.clientX, t.clientY, false);
-            break;
+          if (t.identifier === stickLeftTouchId) {
+            e.preventDefault();
+            updateStickPosition(leftZone, leftKnob, t.clientX, t.clientY, false);
+          } else if (t.identifier === stickRightTouchId) {
+            e.preventDefault();
+            updateStickPosition(rightZone, rightKnob, t.clientX, t.clientY, true);
           }
         }
-      }
-      function onTouchEndLeft(e) {
-        e.preventDefault();
-        let stillActive = false;
-        for (let i = 0; i < e.touches.length; i++) {
-          if (e.touches[i].identifier === stickLeftTouchId) stillActive = true;
-        }
-        if (!stillActive) {
-          stickLeftTouchId = null; stickLeftVec.x = 0; stickLeftVec.y = 0;
-          leftKnob.style.transform = 'translate(0px, 0px)';
+      }, { passive: false });
+
+      function onTouchEndGlobal(e) {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const id = e.changedTouches[i].identifier;
+          if (id === stickLeftTouchId) resetLeftStick();
+          if (id === stickRightTouchId) resetRightStick();
         }
       }
 
-      leftZone.addEventListener('touchstart', (e) => { ensureAudio(); tryAutoFullscreen(); onTouchLeft(e); }, { passive: false });
-      leftZone.addEventListener('touchmove', onTouchLeft, { passive: false });
-      leftZone.addEventListener('touchend', onTouchEndLeft, { passive: false });
-      leftZone.addEventListener('touchcancel', onTouchEndLeft, { passive: false });
+      window.addEventListener('touchend', onTouchEndGlobal, { passive: false });
+      window.addEventListener('touchcancel', onTouchEndGlobal, { passive: false });
 
-      function onTouchRight(e) {
-        e.preventDefault();
-        for (let i = 0; i < e.touches.length; i++) {
-          const t = e.touches[i];
-          if (stickRightTouchId === null || t.identifier === stickRightTouchId) {
-            stickRightTouchId = t.identifier;
-            handleStick(rightZone, rightKnob, t.clientX, t.clientY, true);
-            break;
-          }
-        }
-      }
-      function onTouchEndRight(e) {
-        e.preventDefault();
-        let stillActive = false;
-        for (let i = 0; i < e.touches.length; i++) {
-          if (e.touches[i].identifier === stickRightTouchId) stillActive = true;
-        }
-        if (!stillActive) {
-          stickRightTouchId = null;
-          rightKnob.style.transform = 'translate(0px, 0px)';
-        }
-      }
+      // Fallback para mouse no Desktop
+      leftZone.addEventListener('mousedown', (e) => {
+        ensureAudio();
+        stickLeftTouchId = 'mouse_l';
+        updateStickPosition(leftZone, leftKnob, e.clientX, e.clientY, false);
+        const onMouseMove = (ev) => {
+          if (stickLeftTouchId === 'mouse_l') updateStickPosition(leftZone, leftKnob, ev.clientX, ev.clientY, false);
+        };
+        const onMouseUp = () => {
+          if (stickLeftTouchId === 'mouse_l') resetLeftStick();
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        };
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
 
-      rightZone.addEventListener('touchstart', (e) => { ensureAudio(); tryAutoFullscreen(); onTouchRight(e); }, { passive: false });
-      rightZone.addEventListener('touchmove', onTouchRight, { passive: false });
-      rightZone.addEventListener('touchend', onTouchEndRight, { passive: false });
-      rightZone.addEventListener('touchcancel', onTouchEndRight, { passive: false });
-
-      // Fallback para mouse/pointer no computador
-      leftZone.addEventListener('pointerdown', (e) => {
-        if (e.pointerType === 'touch') return;
-        ensureAudio(); tryAutoFullscreen();
-        stickLeftTouchId = e.pointerId; leftZone.setPointerCapture(e.pointerId);
-        handleStick(leftZone, leftKnob, e.clientX, e.clientY, false);
+      rightZone.addEventListener('mousedown', (e) => {
+        ensureAudio();
+        stickRightTouchId = 'mouse_r';
+        updateStickPosition(rightZone, rightKnob, e.clientX, e.clientY, true);
+        const onMouseMove = (ev) => {
+          if (stickRightTouchId === 'mouse_r') updateStickPosition(rightZone, rightKnob, ev.clientX, ev.clientY, true);
+        };
+        const onMouseUp = () => {
+          if (stickRightTouchId === 'mouse_r') resetRightStick();
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        };
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
       });
-      leftZone.addEventListener('pointermove', (e) => {
-        if (e.pointerType === 'touch') return;
-        if (e.pointerId === stickLeftTouchId) handleStick(leftZone, leftKnob, e.clientX, e.clientY, false);
-      });
-      const resetL = (e) => {
-        if (e.pointerType === 'touch') return;
-        if (e.pointerId === stickLeftTouchId) {
-          stickLeftTouchId = null; stickLeftVec.x = 0; stickLeftVec.y = 0;
-          leftKnob.style.transform = 'translate(0px, 0px)';
-        }
-      };
-      leftZone.addEventListener('pointerup', resetL);
-      leftZone.addEventListener('pointercancel', resetL);
-
-      rightZone.addEventListener('pointerdown', (e) => {
-        if (e.pointerType === 'touch') return;
-        ensureAudio(); tryAutoFullscreen();
-        stickRightTouchId = e.pointerId; rightZone.setPointerCapture(e.pointerId);
-        handleStick(rightZone, rightKnob, e.clientX, e.clientY, true);
-      });
-      rightZone.addEventListener('pointermove', (e) => {
-        if (e.pointerType === 'touch') return;
-        if (e.pointerId === stickRightTouchId) handleStick(rightZone, rightKnob, e.clientX, e.clientY, true);
-      });
-      const resetR = (e) => {
-        if (e.pointerType === 'touch') return;
-        if (e.pointerId === stickRightTouchId) {
-          stickRightTouchId = null;
-          rightKnob.style.transform = 'translate(0px, 0px)';
-        }
-      };
-      rightZone.addEventListener('pointerup', resetR);
-      rightZone.addEventListener('pointercancel', resetR);
     }
 
     function computeMovementVector() {
@@ -1052,6 +1045,14 @@
     }
 
     function playSound(type) {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try {
+          if (type === 'relic') navigator.vibrate(35);
+          else if (type === 'freeze') navigator.vibrate([80, 40, 100]);
+          else if (type === 'stun') navigator.vibrate([50, 30, 50]);
+          else if (type === 'heartbeat') navigator.vibrate(25);
+        } catch (e) {}
+      }
       const ctx = ensureAudio();
       if (!ctx) return;
       const now = ctx.currentTime;
@@ -1198,7 +1199,7 @@
           x: 800, y: 740, dx: 0, dy: 0, angle: 0,
           battery: 100, turbo: false, frozen: false, rescueProgress: 0,
           lit: false, moving: false,
-          stunCharges: 1, stunTimer: 0, stunnedBy: '',
+          stunCharges: myRole === 'hunter' ? 3 : 0, stunTimer: 0, stunnedBy: '',
           phaseTimer: 0, phaseCooldown: 0,
           blackoutCooldown: 0, cloneCooldown: 0, dashCooldown: 0,
           score: 0, treasuresFound: 0,
@@ -1207,17 +1208,17 @@
         'bot_init_1': {
           id: 'bot_init_1', name: 'Pedrão', role: 'hunter', color: '#fbbf24',
           x: 765, y: 740, dx: 0, dy: 0, angle: 0, battery: 100, turbo: false, frozen: false, rescueProgress: 0,
-          lit: false, moving: false, stunCharges: 1, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
+          lit: false, moving: false, stunCharges: 3, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
         },
         'bot_init_2': {
           id: 'bot_init_2', name: 'Queijo', role: 'hunter', color: '#38bdf8',
           x: 810, y: 740, dx: 0, dy: 0, angle: 0, battery: 100, turbo: false, frozen: false, rescueProgress: 0,
-          lit: false, moving: false, stunCharges: 1, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
+          lit: false, moving: false, stunCharges: 3, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
         },
         'bot_init_3': {
           id: 'bot_init_3', name: 'Bibidi', role: 'hunter', color: '#34d399',
           x: 855, y: 740, dx: 0, dy: 0, angle: 0, battery: 100, turbo: false, frozen: false, rescueProgress: 0,
-          lit: false, moving: false, stunCharges: 1, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
+          lit: false, moving: false, stunCharges: 3, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
         }
       },
       clones: [],
@@ -1237,7 +1238,7 @@
           x: 800, y: 740, dx: 0, dy: 0, angle: 0,
           battery: 100, turbo: false, frozen: false, rescueProgress: 0,
           lit: false, moving: false,
-          stunCharges: 1, stunTimer: 0, stunnedBy: '',
+          stunCharges: (payload.role === 'hunter' || !payload.role) ? 3 : 0, stunTimer: 0, stunnedBy: '',
           phaseTimer: 0, phaseCooldown: 0,
           blackoutCooldown: 0, cloneCooldown: 0, dashCooldown: 0,
           score: 0, treasuresFound: 0,
@@ -1270,7 +1271,7 @@
                 x: 720 + i * 45, y: 740, dx: 0, dy: 0, angle: 0,
                 battery: 100, turbo: false, frozen: false, rescueProgress: 0,
                 lit: false, moving: false,
-                stunCharges: 1, stunTimer: 0, stunnedBy: '',
+                stunCharges: 3, stunTimer: 0, stunnedBy: '',
                 phaseTimer: 0, phaseCooldown: 0,
                 blackoutCooldown: 0, cloneCooldown: 0, dashCooldown: 0,
                 score: 0, treasuresFound: 0, isBot: true
@@ -1291,7 +1292,7 @@
               x: 800, y: 740, dx: 0, dy: 0, angle: 0,
               battery: 100, turbo: false, frozen: false, rescueProgress: 0,
               lit: false, moving: false,
-              stunCharges: 1, stunTimer: 0, stunnedBy: '',
+              stunCharges: bRole === 'hunter' ? 3 : 0, stunTimer: 0, stunnedBy: '',
               phaseTimer: 0, phaseCooldown: 0,
               blackoutCooldown: 0, cloneCooldown: 0, dashCooldown: 0,
               score: 0, treasuresFound: 0, isBot: true
@@ -1335,7 +1336,7 @@
         hostEngine.players['bot_h1'] = {
           id: 'bot_h1', name: 'Caçador IA 1', role: 'hunter', color: '#fbbf24',
           x: 760, y: 740, dx: 0, dy: 0, angle: 0, battery: 100,
-          stunCharges: 1, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
+          stunCharges: 3, stunTimer: 0, stunnedBy: '', score: 0, treasuresFound: 0, isBot: true
         };
       }
 
@@ -1345,7 +1346,7 @@
 
       for (const p of Object.values(hostEngine.players)) {
         p.frozen = false; p.rescueProgress = 0; p.battery = 100; p.lit = false;
-        p.stunCharges = p.role === 'hunter' ? 1 : 0;
+        p.stunCharges = p.role === 'hunter' ? 3 : 0;
         p.stunTimer = 0; p.stunnedBy = ''; p.hunterStun = false;
         p.phaseTimer = 0; p.phaseCooldown = 0;
         p.blackoutCooldown = 0; p.cloneCooldown = 0; p.dashCooldown = 0;
@@ -1817,11 +1818,11 @@
             const gDist = Math.hypot(ghost.x - h.x, ghost.y - h.y);
             // Bloqueio de parede/porta: a trava NUNCA atravessa paredes sólidas nem portas fechadas!
             if (gDist < 220 && hasLineOfSight(h.x, h.y, ghost.x, ghost.y, sightObstacles)) {
-              h.stunCharges = 0;
+              h.stunCharges = Math.max(0, (h.stunCharges || 3) - 1);
               ghost.stunTimer = 3.0;
               ghost.stunnedBy = h.name;
               hostEngine.botStunCooldown = 8.5;
-              hostEngine.toast = `⛓️ ${h.name} travou o Fantasma por 3 segundos!`;
+              hostEngine.toast = `⛓️ ${h.name} travou o Fantasma por 3 segundos! (${h.stunCharges} restantes)`;
               hostEngine.toastTimer = 3.0;
             }
           }
@@ -2272,18 +2273,18 @@
           hunterBar.classList.remove('hidden');
         }
 
-        const hasStun = (me.stunCharges || 0) > 0;
+        const charges = me.stunCharges ?? 0;
         const touchStunLbl = document.getElementById('btn-touch-stun-label');
         if (touchStunLbl && btnTouchStun) {
-          touchStunLbl.textContent = hasStun ? 'Travar 3s' : 'Usado';
-          btnTouchStun.style.opacity = hasStun && !me.frozen ? '1' : '0.4';
+          touchStunLbl.textContent = charges > 0 ? `Travar (${charges}x)` : 'Sem Cargas';
+          btnTouchStun.style.opacity = charges > 0 && !me.frozen ? '1' : '0.4';
         }
         const pcStunCd = document.getElementById('hunter-stun-cd');
         const btnPcStun = document.getElementById('btn-pc-stun');
         if (pcStunCd && btnPcStun) {
-          pcStunCd.textContent = hasStun ? 'Pronto (1x)' : 'Já Usado';
-          pcStunCd.className = hasStun ? 'text-xs font-bold text-emerald-400' : 'text-xs font-bold text-zinc-500';
-          btnPcStun.style.opacity = hasStun && !me.frozen ? '1' : '0.45';
+          pcStunCd.textContent = charges > 0 ? `Pronto (${charges}x)` : 'Já Usado (0x)';
+          pcStunCd.className = charges > 0 ? 'text-xs font-bold text-emerald-400' : 'text-xs font-bold text-zinc-500';
+          btnPcStun.style.opacity = charges > 0 && !me.frozen ? '1' : '0.45';
         }
 
         const bat = Math.round(me.battery || 0);
